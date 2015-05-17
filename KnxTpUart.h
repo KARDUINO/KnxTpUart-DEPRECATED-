@@ -31,12 +31,12 @@
 #define MAX_LISTEN_GROUP_ADDRESSES 48
 
 // Macros for converting PA and GA to 2-byte
-#define PA_INTEGER(area, line, member) (byte[]){(area << 4) | line, member}
-#define PA_STRING(address) (byte[]){(String(address).substring(0, String(address).indexOf('.')).toInt() << 4) | String(address).substring(String(address).indexOf('.')+1, String(address).lastIndexOf('.')).toInt(), String(address).substring(String(address).lastIndexOf('.')+1,String(address).length()).toInt()}
+#define PA_INTEGER(area, line, member) (byte*)(const byte[]){(area << 4) | line, member}
+#define PA_STRING(address) (byte*)(const byte[]){(String(address).substring(0, String(address).indexOf('.')).toInt() << 4) | String(address).substring(String(address).indexOf('.')+1, String(address).lastIndexOf('.')).toInt(), String(address).substring(String(address).lastIndexOf('.')+1,String(address).length()).toInt()}
 
 #define GA_ARRAY(area, line, member) {((area << 3) | line), member}
-#define GA_INTEGER(area, line, member) (byte[]){(area << 3) | line, member}
-#define GA_STRING(address) (byte[]){(String(address).substring(0, String(address).indexOf('/')).toInt() << 3) | String(address).substring(String(address).indexOf('/')+1, String(address).lastIndexOf('/')).toInt(), String(address).substring(String(address).lastIndexOf('/')+1,String(address).length()).toInt()}
+#define GA_INTEGER(area, line, member) (byte*)(const byte[]){(area << 3) | line, member}
+#define GA_STRING(address) (byte*)(const byte[]){(String(address).substring(0, String(address).indexOf('/')).toInt() << 3) | String(address).substring(String(address).indexOf('/')+1, String(address).lastIndexOf('/')).toInt(), String(address).substring(String(address).lastIndexOf('/')+1,String(address).length()).toInt()}
 
 
 enum KnxTpUartSerialEventType {

@@ -1,8 +1,8 @@
 #include <KnxTpUart.h>
 
 // Initialize the KNX TP-UART library on the Serial1 port of Arduino 
-KnxTpUart knx(&Serial1, PA_STRING("15.15.20"));
-//KnxTpUart knx(&Serial1, PA_INTEGER(15,15,20));
+//KnxTpUart knx(&Serial1, PA_STRING("15.15.20"));
+KnxTpUart knx(&Serial1, PA_INTEGER(15,15,20));
 
 // Define input pin
 int inPin = 32;
@@ -49,8 +49,8 @@ void loop() {
        
        if (!haveSent) {
            // Send the opposite of what we have sent last
-           bool success = knx.groupWriteBool(GA_STRING("0/0/3"), !onSent);
-           //bool success = knx.groupWriteBool(GA_INTEGER(0,0,3), !onSent);
+           //bool success = knx.groupWriteBool(GA_STRING("0/0/3"), !onSent);
+           bool success = knx.groupWriteBool(GA_INTEGER(0,0,3), !onSent);
            
            Serial.print("Successfully sent: ");
            Serial.println(success);
