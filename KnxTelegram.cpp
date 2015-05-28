@@ -214,7 +214,7 @@ bool KnxTelegram::verifyChecksum() {
 }
 
 void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
-//#if defined(TPUART_DEBUG)
+#if defined(TPUART_DEBUG)
     serial->print("Repeated: ");
     serial->println(isRepeated());
 
@@ -271,7 +271,7 @@ void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
         serial->println(getChecksum(), BIN);
         serial->println(calculateChecksum(), BIN);
     }
-//#endif
+#endif
 }
 
 int KnxTelegram::calculateChecksum() {
