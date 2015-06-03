@@ -136,6 +136,16 @@ void KnxDevice::processTelegram() {
             _knxTpUart->individualAnswerMaskVersion(telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
             break;
 
+        case KNX_COMMAND_MEM_WRITE:        
+            CONSOLEDEBUG("KNX_COMMAND_MEM_WRITE received");
+            processCommandMemWrite(telegram);
+            break;
+
+        case KNX_COMMAND_MEM_READ:        
+            CONSOLEDEBUG("KNX_COMMAND_MEM_READ received");
+            processCommandMemRead(telegram);
+            break;
+
         // received command is of type "extended"
         case KNX_COMMAND_ESCAPE:
 //            CONSOLEDEBUG("KNX_COMMAND_ESCAPE");
@@ -148,16 +158,20 @@ void KnxDevice::processTelegram() {
                         // Authentication request to allow memory access
                         _knxTpUart->individualAnswerAuth(15 /* access level */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
                     }
-                break;
-                
-//                case KNX_EXT_COMMAND_MEM_WRITE:
-                
-                    CONSOLEDEBUG("KNX_EXT_COMMAND_MEM_WRITE received");
-                    processCommandMemWrite(telegram);
-                break;
-                
-            }           
-        
+                    break;       
+
+                case KNX_EXT_COMMAND_PROP_READ:
+                    if (_programmingMode) {
+                        processCommandPropRead(telegram);
+                    }
+                    break;
+                case KNX_EXT_COMMAND_PROP_WRITE:
+                    if (_programmingMode) {
+                        processCommandPropWrite(telegram);
+                    }
+                    break;
+                 
+            }                   
             break;
 
         case KNX_COMMAND_RESTART:
@@ -179,5 +193,22 @@ void KnxDevice::processTelegram() {
 
 }
 
-void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
+void KnxDevice::processCommandMemRead(KnxTelegram* telegram) {
+    // dump telegram data to see structure
+    telegram->print(&Serial);
 }
+void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
+    // dump telegram data to see structure
+    telegram->print(&Serial);
+}
+
+
+void KnxDevice::processCommandPropRead(KnxTelegram* telegram) {
+    // dump telegram data to see structure
+    telegram->print(&Serial);
+}
+void KnxDevice::processCommandPropWrite(KnxTelegram* telegram) {
+    // dump telegram data to see structure
+    telegram->print(&Serial);
+}
+

@@ -22,8 +22,11 @@ private:
 
     void setProgrammingMode(bool on);
     void processTelegram();
+    void processCommandMemRead(KnxTelegram* telegram);
     void processCommandMemWrite(KnxTelegram* telegram);
 
+    void processCommandPropRead(KnxTelegram* telegram);
+    void processCommandPropWrite(KnxTelegram* telegram);
 };
 
 
