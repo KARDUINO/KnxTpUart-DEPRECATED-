@@ -55,6 +55,7 @@ public:
     KnxTelegram* getReceivedTelegram(); 
 
     void setIndividualAddress(byte*);
+    void getIndividualAddress(byte address[2]);
     
     void sendAck();
     void sendNotAddressed();
@@ -83,7 +84,7 @@ public:
     bool individualAnswerAuth(int, int, int, int, int);
 
     bool sendPropertyResponse(byte* /*address (PA of origin)*/, int /*object*/, int /*propertyid*/, int /*start*/, int /*size of data*/, byte* /*data array*/);
-    
+
     void setListenToBroadcasts(bool);
     
     void groupBytesToInt(byte*, int*);
@@ -113,3 +114,4 @@ private:
 
 
 #endif
+

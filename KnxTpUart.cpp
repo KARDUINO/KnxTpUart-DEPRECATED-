@@ -31,6 +31,11 @@ void KnxTpUart::setIndividualAddress(byte address[2]) {
     _individualAddress[1] = address[1];
 }
 
+void KnxTpUart::getIndividualAddress(byte address[2]) {
+    address[0] = _individualAddress[0];
+    address[1] = _individualAddress[1];
+}
+
 KnxTpUartSerialEventType KnxTpUart::serialEvent() {
     while (_serialport->available() > 0) {
         checkErrors();
