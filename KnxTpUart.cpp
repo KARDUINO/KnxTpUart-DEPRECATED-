@@ -405,7 +405,7 @@ bool KnxTpUart::individualAnswerAuth(int accessLevel, int sequenceNo, int area, 
 bool KnxTpUart::sendPropertyResponse(int objIndex, int propId, int start, int elements, byte data[], int sequenceNo, int area, int line, int member) {
     int payload = 2+4+elements;
     
-    // PA_INTEGER Macro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
+    // PA_INTEGER cacro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
     // Method execution seems to stop and default value (false?) is returned. Se we calc it ourselves.
     byte target[2];
     target[0] = (area << 4) | line;
@@ -413,7 +413,7 @@ bool KnxTpUart::sendPropertyResponse(int objIndex, int propId, int start, int el
      
     /*
         it's important to use "another telegram". If one just uses _tg for the answer, this conflicts...
-        One has to use "another" telegram. _tg_ptp is already there for this scenarios
+        _tg_ptp is already there for this scenarios
     */
     
     _tg_ptp->clear();
@@ -504,12 +504,7 @@ bool KnxTpUart::sendMemoryReadResponse(int start, int length, byte data[], int s
     for (int i = 0; i < length; i++) {
         _tg_ptp->setBufferByte(10+i, data[i]);
     }
-    
-    _tg_ptp->createChecksum();
-    
-    Serial.print("MemRead Answer Dump: ");
-    _tg_ptp->print(&Serial);
-    
+      
     _tg_ptp->createChecksum();
        
     int messageSize = _tg_ptp->getTotalLength();

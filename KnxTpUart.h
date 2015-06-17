@@ -6,6 +6,47 @@
 
 #include "KnxTelegram.h"
 
+// --------------------------------------------
+// Debug-Stuff
+
+// enable/disable log-levels
+#ifdef DEBUGLEVEL_INFO
+#define DEBUG_INFO(...) CONSOLEDEBUG(__VA_ARGS__)
+#else
+#define DEBUG_INFO(...)
+#endif
+
+#ifdef DEBUGLEVEL_DEBUG
+#define DEBUG_DEBUG(...) CONSOLEDEBUG(__VA_ARGS__)
+#else
+#define DEBUG_DEBUG(...)
+#endif
+
+#ifdef DEBUGLEVEL_TRACE
+#define DEBUG_TRACE(...) CONSOLEDEBUG(__VA_ARGS__)
+#else
+#define DEBUG_TRACE(...)
+#endif
+
+// enable/disable general debugging
+#ifdef DEBUG
+#define CONSOLEDEBUG(...)  \
+	Serial.print(millis());     \
+	Serial.print(": ");    \
+	Serial.print(__PRETTY_FUNCTION__); \
+	Serial.print(' ');      \
+	Serial.print(__FILE__);     \
+	Serial.print(':');      \
+	Serial.print(__LINE__);     \
+	Serial.print(' '); \
+	sprintf (consolebuffer, __VA_ARGS__); Serial.println(consolebuffer);
+char consolebuffer[120];
+#else
+#define CONSOLEDEBUG(...) 
+#endif
+// --------------------------------------------
+
+
 // See http://www.hqs.sbt.siemens.com/cps_product_data/gamma-b2b/tpuart.pdf , Page 12
 
 // Services from TPUART (means: services we are receiving from BCU), Chapter of above PDF: 3.2.3.2 Services from UART
@@ -20,8 +61,8 @@
 
 // Debugging
 // uncomment the following line to enable debugging
-#define TPUART_DEBUG true
-#define TPUART_DEBUG_PORT Serial
+//#define TPUART_DEBUG true
+//#define TPUART_DEBUG_PORT Serial
 
 #define TPUART_SERIAL_CLASS Stream
 

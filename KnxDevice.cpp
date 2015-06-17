@@ -1,6 +1,5 @@
 #include "KnxDevice.h"
 #include "EEPROM.h"
-#define DEBUG
 
 // Index of Individual Address (PA) in EEPROM
 #define EEPROM_INDEX_PA 0
@@ -10,12 +9,9 @@
 // -------- DON'T CHANGE ANYTHING BELOW THIS LINE ---------------------------
  
 
-#if defined(DEBUG)
-#define CONSOLEDEBUG(...)  sprintf (consolebuffer, __VA_ARGS__); Serial.println(consolebuffer);
-char consolebuffer[80];
-#else
-#define CONSOLEDEBUG(...) 
-#endif
+ 
+
+
 
 #if defined(DEBUG)
 
@@ -35,7 +31,6 @@ void KnxDevice::loop() {
     // prog switch button
     int button = digitalRead(PIN_PROG_BUTTON);
     if (button != _lastProgButtonValue) {
-        //CONSOLEDEBUG("ProgButton: %i", button);
         _lastProgButtonValue = button;
         delay(10);
         if (button==1)  {
@@ -48,7 +43,7 @@ void KnxDevice::loop() {
  * Enable or disable programming mode
  */
 void KnxDevice::setProgrammingMode(bool on) {
-    CONSOLEDEBUG("setProgrammingMode: %i", on);
+    DEBUG_INFO("setProgrammingMode: %i", on);
     _programmingMode = on;
     digitalWrite(PIN_PROG_LED, on);
     _knxTpUart->setListenToBroadcasts(on);
@@ -62,9 +57,9 @@ KnxTpUartSerialEventType KnxDevice::serialEvent() {
 
         case KNX_TELEGRAM: 
 //        case IRRELEVANT_KNX_TELEGRAM:
-            CONSOLEDEBUG("\nProcessing ...");            
+            DEBUG_INFO("\nProcessing ...");            
             processTelegram();
-            CONSOLEDEBUG("Processing ... *DONE*\n\n");
+            DEBUG_INFO("Processing ... *DONE*\n\n");
             break;
           
         default:
@@ -91,16 +86,7 @@ void KnxDevice::processTelegram() {
     ApplicationControlField apci = telegram->getApplicationControlField();
     
     switch (apci) {
-    
-        case A_GROUPVALUE_READ:
-            break;
-
-        case A_GROUPVALUE_WRITE:
-            break;
-            
-        case A_GROUPVALUE_RESPONSE:
-            break;
-    
+        
         case A_PHYSICALADDRESS_WRITE:
             if (_programmingMode && telegram->isTargetGroup()) {
             
@@ -108,7 +94,7 @@ void KnxDevice::processTelegram() {
                 int line = telegram->getBufferByte(8) & B00001111;
                 int member = telegram->getBufferByte(9);
                 
-                CONSOLEDEBUG("A_PHYSICALADDRESS_WRITE: %i.%i.%i", area, line, member);                
+                DEBUG_INFO("A_PHYSICALADDRESS_WRITE: %i.%i.%i", area, line, member);                
                 
                 _knxTpUart->setIndividualAddress(PA_INTEGER(area, line, member));
                 
@@ -123,54 +109,54 @@ void KnxDevice::processTelegram() {
             break;
             
         case A_PHYSICALADDRESS_READ:
-            CONSOLEDEBUG("A_PHYSICALADDRESS_READ");
+            DEBUG_INFO("A_PHYSICALADDRESS_READ");
             if (_programmingMode) {
                 // Broadcast request for individual addresses of all devices in programming mode
-                CONSOLEDEBUG("A_PHYSICALADDRESS_READ answering ...");
+                DEBUG_INFO("A_PHYSICALADDRESS_READ answering ...");
 		        // Send our answer back to sender
                 _knxTpUart->individualAnswerAddress(); 
             }            
             break;
             
         case A_PHYSICALADDRESS_RESPONSE:
-            CONSOLEDEBUG("A_PHYSICALADDRESS_RESPONSE");
+            DEBUG_INFO("A_PHYSICALADDRESS_RESPONSE");
             telegram->print(&Serial);
             break;
             
         case A_DEVICEDESCRIPTOR_READ:
-            CONSOLEDEBUG("A_DEVICEDESCRIPTOR_READ");
+            DEBUG_INFO("A_DEVICEDESCRIPTOR_READ");
             // Request for mask version (version of bus interface)
             _knxTpUart->individualAnswerMaskVersion(telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
             break;
             
         case A_MEMORY_WRITE:        
-            CONSOLEDEBUG("A_MEMORY_WRITE");
+            DEBUG_INFO("A_MEMORY_WRITE");
             processCommandMemWrite(telegram);
             break;
 
         case A_MEMORY_READ:        
-            CONSOLEDEBUG("A_MEMORY_READ");
+            DEBUG_INFO("A_MEMORY_READ");
             processCommandMemRead(telegram);
             break;
 
         case A_AUTHORIZE_REQUEST:
-            CONSOLEDEBUG("A_AUTHORIZE_REQUEST");
+            DEBUG_INFO("A_AUTHORIZE_REQUEST");
             if (_programmingMode) {
-                CONSOLEDEBUG("A_AUTHORIZE_REQUEST answering ...");
+                DEBUG_INFO("A_AUTHORIZE_REQUEST answering ...");
                 // Authentication request to allow memory access
                 _knxTpUart->individualAnswerAuth(15 /* accesslevel */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
             }
             break;       
 
         case A_PROPERTYVALUE_READ:
-            CONSOLEDEBUG("A_PROPERTYVALUE_READ");                
+            DEBUG_INFO("A_PROPERTYVALUE_READ");                
             if (_programmingMode) {
                 processCommandPropRead(telegram);
             } 
             break;
             
         case A_PROPERTYVALUE_WRITE:
-            CONSOLEDEBUG("A_PROPERTYVALUE_WRITE");   
+            DEBUG_INFO("A_PROPERTYVALUE_WRITE");   
             if (_programmingMode) {
                 processCommandPropWrite(telegram);
             }
@@ -178,18 +164,18 @@ void KnxDevice::processTelegram() {
                  
 
         case A_RESTART:
-            CONSOLEDEBUG("A_RESTART received");
+            DEBUG_INFO("A_RESTART received");
             if (_programmingMode) {
                 // Restart the device -> end programming mode
                 setProgrammingMode(false);
-                CONSOLEDEBUG("Received restart, ending programming mode"); 
+                DEBUG_INFO("Received restart, ending programming mode"); 
             }
             break;    
             
 
             
         default:
-            CONSOLEDEBUG("Unhandled APCI: %i", apci);
+            DEBUG_INFO("Unhandled APCI: %i", apci);
             break;
             
     }
@@ -208,27 +194,30 @@ void KnxDevice::processCommandMemRead(KnxTelegram* telegram) {
     
     unsigned int start = telegram->getMemoryStart();
     int length = telegram->getMemoryLength();
-    
+
+#ifdef DEBUGLEVEL_DEBUG    
     Serial.print("Start: ");
     Serial.println(start, HEX);
     Serial.print("Length: ");
     Serial.println(length);
-    
+#endif   
     
     byte data[length];
     
     for(int i=0;i<length;i++){
-        Serial.print("Read from eeprom: ");
+        
         data[i] = EEPROM.read(start+i);
+#ifdef DEBUGLEVEL_DEBUG
+		Serial.print("Read from eeprom: ");
         Serial.print(start+i);
         Serial.print(" -> ");
         Serial.println(data[i],HEX);
+#endif		
     }
     
     bool result = _knxTpUart->sendMemoryReadResponse(start, length, data, seqNr, area, line, member);
     
-    Serial.print("Result=");
-    Serial.println(result);
+    DEBUG_DEBUG("Result=%i", result);
     
 }
 
@@ -241,13 +230,16 @@ void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
     int length = telegram->getMemoryLength();
     byte data[length];
     telegram->getMemoryData(data);
-    
+
+#ifdef DEBUGLEVEL_DEBUG    
     Serial.print("Start: ");
     Serial.println(start, HEX);
     Serial.print("Length: ");
     Serial.println(length);
+#endif
     
     for(int i=0;i<length;i++){
+#ifdef DEBUGLEVEL_DEBUG    	
         Serial.print("data[");
         Serial.print(i);
         Serial.print("]=");
@@ -255,9 +247,8 @@ void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
         
         Serial.print("Writing to eeprom: ");
         Serial.println(start+i);
-        
+#endif
         EEPROM.write(start+i, data[i]);
-        
     }
     
 }

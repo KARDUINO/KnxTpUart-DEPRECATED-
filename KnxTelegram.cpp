@@ -1,3 +1,4 @@
+#include "KnxTpUart.h"
 #include "KnxTelegram.h"
 
 KnxTelegram::KnxTelegram() {
@@ -214,6 +215,9 @@ ApplicationControlField KnxTelegram::getApplicationControlField() {
         case B1110:
             if (bits6 == B000000) result = A_RESTART;
             
+		default:
+			DEBUG_TRACE("Unhandled ApplicationControlField: 4bit: %02x 6bit: %02x", bits4, bits6);
+			break;
 
     }
             
@@ -296,7 +300,7 @@ bool KnxTelegram::verifyChecksum() {
 }
 
 void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
-//#if defined(TPUART_DEBUG)
+#if defined(DEBUGLEVEL_TRACE)
     serial->println("##### DUMP START #####");
 
     for (int i = 0; i < MAX_KNX_TELEGRAM_SIZE; i++) {
@@ -375,7 +379,7 @@ void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
         serial->println(calculateChecksum(), BIN);
     }
     serial->println("##### DUMP END #####");
-//#endif
+#endif
 }
 
 int KnxTelegram::calculateChecksum() {

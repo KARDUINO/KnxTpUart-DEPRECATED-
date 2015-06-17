@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
+#define DEBUG
+#define DEBUGLEVEL_INFO
+
 // für den KNX Zugriff
 #include <KnxTelegram.h>
 #include <KnxTpUart.h>
@@ -28,8 +31,10 @@ void setup() {
     Serial1.begin(19200);
     UCSR1C = UCSR1C | B00100000; // Even Parity
     knx.uartReset(); 
+	
     knx.addListenGroupAddress(GA_INTEGER(7,7,7));
-    Serial.println("Running ....");
+	
+    DEBUG_INFO("Running ....");
 }
 
 
