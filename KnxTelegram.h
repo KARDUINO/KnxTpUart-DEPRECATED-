@@ -18,18 +18,22 @@ enum KnxPriorityType {
 
 // KNX commands / APCI Coding
 // see: http://www.mikrocontroller.net/attachment/151008/KNX_Twisted_Pair_Protokollbeschreibung.pdf
+// Octet 6, Bit 2+1
 enum KnxCommandType {
-    KNX_COMMAND_READ                     = B0000,
-    KNX_COMMAND_ANSWER                   = B0001,
-    KNX_COMMAND_WRITE                    = B0010,
-    KNX_COMMAND_INDIVIDUAL_ADDR_WRITE    = B0011,
-    KNX_COMMAND_INDIVIDUAL_ADDR_REQUEST  = B0100,
-    KNX_COMMAND_INDIVIDUAL_ADDR_RESPONSE = B0101,
-    KNX_COMMAND_ADC_READ                 = B0110,
-    KNX_COMMAND_ADC_ANSWER               = B0111,
-    KNX_COMMAND_MEM_READ                 = B1000, //(CC)
-    KNX_COMMAND_MEM_ANSWER               = B1001, //(CC)
-    KNX_COMMAND_MEM_WRITE                = B1010, //(CC) 
+    KNX_COMMAND_READ                     = B0000, // Multicast
+    KNX_COMMAND_ANSWER                   = B0001, // "
+    KNX_COMMAND_WRITE                    = B0010, // "
+
+    KNX_COMMAND_INDIVIDUAL_ADDR_WRITE    = B0011, // Broadcast
+    KNX_COMMAND_INDIVIDUAL_ADDR_REQUEST  = B0100, // "
+    KNX_COMMAND_INDIVIDUAL_ADDR_RESPONSE = B0101, // "
+    
+    KNX_COMMAND_ADC_READ                 = B0110, // one-to-one connection-oriented
+    KNX_COMMAND_ADC_ANSWER               = B0111, // "
+    KNX_COMMAND_MEM_READ                 = B1000, // "
+    KNX_COMMAND_MEM_ANSWER               = B1001, // "
+    KNX_COMMAND_MEM_WRITE                = B1010, // "
+    
     KNX_COMMAND_MASK_VERSION_READ        = B1100,
     KNX_COMMAND_MASK_VERSION_RESPONSE    = B1101,
     KNX_COMMAND_RESTART                  = B1110,
@@ -39,6 +43,7 @@ enum KnxCommandType {
 // Extended (escaped) KNX commands
 // requires KNX_COMMAND_ESCAPE
 // see: http://www.mikrocontroller.net/attachment/151008/KNX_Twisted_Pair_Protokollbeschreibung.pdf
+// Octet 7,
 enum KnxExtendedCommandType {
     KNX_EXT_COMMAND_PROP_READ        = B010101, 
     KNX_EXT_COMMAND_PROP_ANSWER      = B010110,
@@ -47,6 +52,36 @@ enum KnxExtendedCommandType {
     KNX_EXT_COMMAND_PROP_DESC_ANSWER = B011001,
     KNX_EXT_COMMAND_AUTH_REQUEST     = B010001,
     KNX_EXT_COMMAND_AUTH_RESPONSE    = B010010 
+};
+
+enum ApplicationControlField {
+
+    A_UNKNOWN = -1,
+
+    A_GROUPVALUE_READ           = 1,
+    A_GROUPVALUE_RESPONSE       = 2,
+    A_GROUPVALUE_WRITE          = 3,
+    
+    A_PHYSICALADDRESS_READ      = 4,
+    A_PHYSICALADDRESS_RESPONSE  = 5,
+    A_PHYSICALADDRESS_WRITE     = 6,
+    
+    A_PROPERTYVALUE_READ        = 7,
+    A_PROPERTYVALUE_RESPONSE    = 8,
+    A_PROPERTYVALUE_WRITE       = 9,
+    
+    A_MEMORY_READ               = 10,
+    A_MEMORY_RESPONSE           = 11,
+    A_MEMORY_WRITE              = 12,
+    
+    A_DEVICEDESCRIPTOR_READ     = 13,
+    A_DEVICEDESCRIPTOR_RESPONSE = 14,
+    
+    A_RESTART                   = 15,
+    
+    A_AUTHORIZE_REQUEST         = 16,
+    A_AUTHORIZE_RESPONSE        = 17    
+     
 };
 
 // KNX Transport Layer Communication Type
@@ -103,6 +138,8 @@ class KnxTelegram {
         void setRoutingCounter(int counter);
         int getRoutingCounter();
         
+        ApplicationControlField getApplicationControlField();
+        
         void setCommand(KnxCommandType command);
         KnxCommandType getCommand();
         
@@ -151,11 +188,15 @@ class KnxTelegram {
 //    int curr_property; 
 //    int curr_length = 2;
 //    byte curr_data[curr_length];
-        int getPropertyObject();
-        int getPropertyId();
-        int getPropertyCount();
+        int getPropertyObjIndex();
+        int getPropertyPropId();
+        int getPropertyStart();
+        int getPropertyElements();
         void getPropertyData(byte* data);
         
+        int getMemoryLength();
+        unsigned int getMemoryStart();
+        void getMemoryData(byte* data);
 
     private:
         int buffer[MAX_KNX_TELEGRAM_SIZE];

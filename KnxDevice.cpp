@@ -1,6 +1,5 @@
 #include "KnxDevice.h"
-#include <EEPROM.h>
-
+#include "EEPROM.h"
 #define DEBUG
 
 // Index of Individual Address (PA) in EEPROM
@@ -25,13 +24,18 @@ char consolebuffer[80];
 
 KnxDevice::KnxDevice(KnxTpUart* knxTpUart) {
     _knxTpUart = knxTpUart;
+    _programmingMode = false;
+    _lastProgButtonValue = 0;
+
+    // for testing only
+    setProgrammingMode(true);
 }
 
 void KnxDevice::loop() {
     // prog switch button
     int button = digitalRead(PIN_PROG_BUTTON);
     if (button != _lastProgButtonValue) {
-        CONSOLEDEBUG("ProgButton: %i", button);
+        //CONSOLEDEBUG("ProgButton: %i", button);
         _lastProgButtonValue = button;
         delay(10);
         if (button==1)  {
@@ -56,12 +60,20 @@ KnxTpUartSerialEventType KnxDevice::serialEvent() {
 
     switch(knxEventType) {
 
-        case KNX_TELEGRAM:     
-            CONSOLEDEBUG("it's a KNX telegram...");
+        case KNX_TELEGRAM: 
+//        case IRRELEVANT_KNX_TELEGRAM:
+            CONSOLEDEBUG("\nProcessing ...");            
             processTelegram();
+            CONSOLEDEBUG("Processing ... *DONE*\n\n");
             break;
           
         default:
+/*
+            Serial.print("\nNOT HANDLED TYPE: bin=");
+            Serial.println(knxEventType, BIN);
+            KnxTelegram* telegram = _knxTpUart->getReceivedTelegram();
+            telegram->print(&Serial);
+*/
             break;
 
     }
@@ -75,38 +87,28 @@ KnxTpUartSerialEventType KnxDevice::serialEvent() {
 void KnxDevice::processTelegram() {
 
     KnxTelegram* telegram = _knxTpUart->getReceivedTelegram();
-    CONSOLEDEBUG("-> Telegram command: ");
-#if defined(DEBUG)
-    Serial.println(telegram->getCommand(), BIN);
-#endif
-
-    // Check which kind of telegram it is
-    switch(telegram->getCommand()) {
-
-        // someone wants to read data (from us?)
-        case KNX_COMMAND_READ:
-//            CONSOLEDEBUG("--> KNX command read");
+    
+    ApplicationControlField apci = telegram->getApplicationControlField();
+    
+    switch (apci) {
+    
+        case A_GROUPVALUE_READ:
             break;
 
-        // someone is sending data (to us?)
-        case KNX_COMMAND_WRITE: 
-//            CONSOLEDEBUG("--> KNX command write");        
+        case A_GROUPVALUE_WRITE:
             break;
-
-        // someone has answered a read request (ours?)
-        case KNX_COMMAND_ANSWER:
-//            CONSOLEDEBUG("--> KNX command answer");        
+            
+        case A_GROUPVALUE_RESPONSE:
             break;
-
-        // someone wants to set a PA
-        case KNX_COMMAND_INDIVIDUAL_ADDR_WRITE:
+    
+        case A_PHYSICALADDRESS_WRITE:
             if (_programmingMode && telegram->isTargetGroup()) {
             
                 int area = (telegram->getBufferByte(8) & B11110000) >> 4;
                 int line = telegram->getBufferByte(8) & B00001111;
                 int member = telegram->getBufferByte(9);
                 
-                CONSOLEDEBUG("--> KNX_COMMAND_INDIVIDUAL_ADDR_WRITE: %i.%i.%i", area, line, member);                
+                CONSOLEDEBUG("A_PHYSICALADDRESS_WRITE: %i.%i.%i", area, line, member);                
                 
                 _knxTpUart->setIndividualAddress(PA_INTEGER(area, line, member));
                 
@@ -119,93 +121,191 @@ void KnxDevice::processTelegram() {
                 
             }
             break;
-
-        case KNX_COMMAND_INDIVIDUAL_ADDR_REQUEST:
-//            CONSOLEDEBUG("KNX_COMMAND_INDIVIDUAL_ADDR_REQUEST");
+            
+        case A_PHYSICALADDRESS_READ:
+            CONSOLEDEBUG("A_PHYSICALADDRESS_READ");
             if (_programmingMode) {
                 // Broadcast request for individual addresses of all devices in programming mode
-                CONSOLEDEBUG("KNX_COMMAND_INDIVIDUAL_ADDR_REQUEST answering ...");
+                CONSOLEDEBUG("A_PHYSICALADDRESS_READ answering ...");
 		        // Send our answer back to sender
                 _knxTpUart->individualAnswerAddress(); 
-            }
+            }            
             break;
-
-        case KNX_COMMAND_MASK_VERSION_READ:
-            CONSOLEDEBUG("KNX_COMMAND_MASK_VERSION_READ");
+            
+        case A_PHYSICALADDRESS_RESPONSE:
+            CONSOLEDEBUG("A_PHYSICALADDRESS_RESPONSE");
+            telegram->print(&Serial);
+            break;
+            
+        case A_DEVICEDESCRIPTOR_READ:
+            CONSOLEDEBUG("A_DEVICEDESCRIPTOR_READ");
             // Request for mask version (version of bus interface)
             _knxTpUart->individualAnswerMaskVersion(telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
             break;
-
-        case KNX_COMMAND_MEM_WRITE:        
-            CONSOLEDEBUG("KNX_COMMAND_MEM_WRITE received");
+            
+        case A_MEMORY_WRITE:        
+            CONSOLEDEBUG("A_MEMORY_WRITE");
             processCommandMemWrite(telegram);
             break;
 
-        case KNX_COMMAND_MEM_READ:        
-            CONSOLEDEBUG("KNX_COMMAND_MEM_READ received");
+        case A_MEMORY_READ:        
+            CONSOLEDEBUG("A_MEMORY_READ");
             processCommandMemRead(telegram);
             break;
 
-        // received command is of type "extended"
-        case KNX_COMMAND_ESCAPE:
-//            CONSOLEDEBUG("KNX_COMMAND_ESCAPE");
-            switch (telegram->getExtendedCommand()) {
-            
-                case KNX_EXT_COMMAND_AUTH_REQUEST:
-//                    CONSOLEDEBUG("KNX_EXT_COMMAND_AUTH_REQUEST");
-                    if (_programmingMode) {
-                        CONSOLEDEBUG("KNX_EXT_COMMAND_AUTH_REQUEST answering ...");
-                        // Authentication request to allow memory access
-                        _knxTpUart->individualAnswerAuth(15 /* access level */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
-                    }
-                    break;       
+        case A_AUTHORIZE_REQUEST:
+            CONSOLEDEBUG("A_AUTHORIZE_REQUEST");
+            if (_programmingMode) {
+                CONSOLEDEBUG("A_AUTHORIZE_REQUEST answering ...");
+                // Authentication request to allow memory access
+                _knxTpUart->individualAnswerAuth(15 /* accesslevel */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
+            }
+            break;       
 
-                case KNX_EXT_COMMAND_PROP_READ:
-                    if (_programmingMode) {
-                        processCommandPropRead(telegram);
-                    }
-                    break;
-                case KNX_EXT_COMMAND_PROP_WRITE:
-                    if (_programmingMode) {
-                        processCommandPropWrite(telegram);
-                    }
-                    break;
-                 
-            }                   
+        case A_PROPERTYVALUE_READ:
+            CONSOLEDEBUG("A_PROPERTYVALUE_READ");                
+            if (_programmingMode) {
+                processCommandPropRead(telegram);
+            } 
             break;
+            
+        case A_PROPERTYVALUE_WRITE:
+            CONSOLEDEBUG("A_PROPERTYVALUE_WRITE");   
+            if (_programmingMode) {
+                processCommandPropWrite(telegram);
+            }
+            break;
+                 
 
-        case KNX_COMMAND_RESTART:
-            CONSOLEDEBUG("KNX_COMMAND_RESTART received");
+        case A_RESTART:
+            CONSOLEDEBUG("A_RESTART received");
             if (_programmingMode) {
                 // Restart the device -> end programming mode
                 setProgrammingMode(false);
                 CONSOLEDEBUG("Received restart, ending programming mode"); 
             }
+            break;    
+            
+
+            
+        default:
+            CONSOLEDEBUG("Unhandled APCI: %i", apci);
             break;
-
-      default:
-            CONSOLEDEBUG("############# Unhandled: %i", telegram->getCommand());
-            break;
-    } 
-
-
-
+            
+    }
 
 }
 
 void KnxDevice::processCommandMemRead(KnxTelegram* telegram) {
     // dump telegram data to see structure
     telegram->print(&Serial);
+    
+    int area = telegram->getSourceArea();
+    int line = telegram->getSourceLine();
+    int member = telegram->getSourceMember();
+    
+    int seqNr = telegram->getSequenceNumber();
+    
+    unsigned int start = telegram->getMemoryStart();
+    int length = telegram->getMemoryLength();
+    
+    Serial.print("Start: ");
+    Serial.println(start, HEX);
+    Serial.print("Length: ");
+    Serial.println(length);
+    
+    
+    byte data[length];
+    
+    for(int i=0;i<length;i++){
+        Serial.print("Read from eeprom: ");
+        data[i] = EEPROM.read(start+i);
+        Serial.print(start+i);
+        Serial.print(" -> ");
+        Serial.println(data[i],HEX);
+    }
+    
+    bool result = _knxTpUart->sendMemoryReadResponse(start, length, data, seqNr, area, line, member);
+    
+    Serial.print("Result=");
+    Serial.println(result);
+    
 }
+
+
 void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
     // dump telegram data to see structure
     telegram->print(&Serial);
+    
+    unsigned int start = telegram->getMemoryStart();
+    int length = telegram->getMemoryLength();
+    byte data[length];
+    telegram->getMemoryData(data);
+    
+    Serial.print("Start: ");
+    Serial.println(start, HEX);
+    Serial.print("Length: ");
+    Serial.println(length);
+    
+    for(int i=0;i<length;i++){
+        Serial.print("data[");
+        Serial.print(i);
+        Serial.print("]=");
+        Serial.println(data[i], HEX);
+        
+        Serial.print("Writing to eeprom: ");
+        Serial.println(start+i);
+        
+        EEPROM.write(start+i, data[i]);
+        
+    }
+    
 }
 
 
 void KnxDevice::processCommandPropRead(KnxTelegram* telegram) {
     // dump telegram data to see structure
     telegram->print(&Serial);
+    
+    int objIndex = telegram->getPropertyObjIndex();
+    int propId = telegram->getPropertyPropId();
+    int start = telegram->getPropertyStart();
+    int elements = telegram->getPropertyElements();
+    
+    int area = telegram->getSourceArea();
+    int line = telegram->getSourceLine();
+    int member = telegram->getSourceMember();
+    
+    int seqNr = telegram->getSequenceNumber();
+    
+    byte data[elements];
+    telegram->getPropertyData(data);
+        
+    Serial.print("target: ");
+    Serial.print(area);
+    Serial.print(".");
+    Serial.print(line);
+    Serial.print(".");
+    Serial.println(member);
+    
+    
+    Serial.print("ObjIndex=");
+    Serial.println(objIndex);
+    Serial.print("PropId=");
+    Serial.println(propId);
+    Serial.print("Start=");
+    Serial.println(start);
+    Serial.print("Elements=");
+    Serial.println(elements);
+    byte dataResponse[1];
+    
+    dataResponse[0] = 10;
+    
+    bool result = _knxTpUart->sendPropertyResponse(objIndex, propId, start, elements, dataResponse, seqNr, area, line, member);
+    
+    Serial.print("Result=");
+    Serial.println(result);
+    
 }
 void KnxDevice::processCommandPropWrite(KnxTelegram* telegram) {
     // dump telegram data to see structure

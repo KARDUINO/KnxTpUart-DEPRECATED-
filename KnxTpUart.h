@@ -6,16 +6,21 @@
 
 #include "KnxTelegram.h"
 
-// Services from TPUART
+// See http://www.hqs.sbt.siemens.com/cps_product_data/gamma-b2b/tpuart.pdf , Page 12
+
+// Services from TPUART (means: services we are receiving from BCU), Chapter of above PDF: 3.2.3.2 Services from UART
 #define TPUART_RESET_INDICATION_BYTE B11
 
-// Services to TPUART
-#define TPUART_DATA_START_CONTINUE B10000000
-#define TPUART_DATA_END B01000000
+// Services to TPUART (means: services we are sending to BCU), Chapter of above PDF: 3.2.3.1 Services to UART
+#define TPUART_DATA_START_CONTINUE  B10000000
+#define TPUART_DATA_END             B01000000
+
+
+
 
 // Debugging
 // uncomment the following line to enable debugging
-//#define TPUART_DEBUG true
+#define TPUART_DEBUG true
 #define TPUART_DEBUG_PORT Serial
 
 #define TPUART_SERIAL_CLASS Stream
@@ -25,7 +30,7 @@
 #define SERIAL_WRITE_DELAY_MS 0
 
 // Timeout for reading a byte from TPUART
-#define SERIAL_READ_TIMEOUT_MS 10
+#define SERIAL_READ_TIMEOUT_MS 300
 
 // Maximum number of group addresses that can be listened on
 #define MAX_LISTEN_GROUP_ADDRESSES 48
@@ -83,7 +88,8 @@ public:
     bool individualAnswerMaskVersion(int, int, int);
     bool individualAnswerAuth(int, int, int, int, int);
 
-    bool sendPropertyResponse(byte* /*address (PA of origin)*/, int /*object*/, int /*propertyid*/, int /*start*/, int /*size of data*/, byte* /*data array*/);
+    bool sendPropertyResponse(int objIndex, int propId, int start, int elements, byte* data, int sequenceNo, int area, int line, int member);
+    bool sendMemoryReadResponse(int start, int length, byte* data, int seqNr, int area, int line, int member);
 
     void setListenToBroadcasts(bool);
     
@@ -106,7 +112,7 @@ private:
     void createKNXMessageFrame(int, KnxCommandType, byte* targetGroupAddress, int);
     void createKNXMessageFrameIndividual(int, KnxCommandType, byte* targetIndividualAddress, int);
     bool sendMessage();
-    bool sendNCDPosConfirm(int, byte* targetIndividualAddress);
+    bool sendTransportDataAckPDU(int, byte* targetIndividualAddress);
     int serialRead();
 
 };

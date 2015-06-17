@@ -4,7 +4,6 @@
 
 #include "Arduino.h"
 
-
 #include "KnxTpUart.h"
 
 class KnxDevice {
@@ -15,8 +14,8 @@ public:
     void loop();
     
 private:
-    bool _programmingMode = false;
-    int _lastProgButtonValue = 0;
+    bool _programmingMode;
+    int _lastProgButtonValue;
 
     KnxTpUart* _knxTpUart;
 

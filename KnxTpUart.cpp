@@ -41,75 +41,71 @@ KnxTpUartSerialEventType KnxTpUart::serialEvent() {
         checkErrors();
         
         int incomingByte = _serialport->peek();
-        printByte(incomingByte);
+
+        //TPUART_DEBUG_PORT.print("##### KnxTpUart::serialEvent() incomingByte: hex=");
+        //TPUART_DEBUG_PORT.print(incomingByte, HEX);
+        //TPUART_DEBUG_PORT.print(" bin=");
+        //TPUART_DEBUG_PORT.println(incomingByte, BIN);
         
         if (isKNXControlByte(incomingByte)) {
+                    
             bool interested = readKNXTelegram();
             if (interested) {
-#if defined(TPUART_DEBUG)
-                TPUART_DEBUG_PORT.println("Event KNX_TELEGRAM");
-#endif
+                //TPUART_DEBUG_PORT.println("Event KNX_TELEGRAM (L_DATA.ind)");
                 return KNX_TELEGRAM;
             } else {
-#if defined(TPUART_DEBUG)
-                TPUART_DEBUG_PORT.println("Event IRRELEVANT_KNX_TELEGRAM");
-#endif
+                //TPUART_DEBUG_PORT.println("Event IRRELEVANT_KNX_TELEGRAM (L_DATA.ind)");
                 return IRRELEVANT_KNX_TELEGRAM;
             }
         } else if (incomingByte == TPUART_RESET_INDICATION_BYTE) {
             serialRead();
-#if defined(TPUART_DEBUG)
-            TPUART_DEBUG_PORT.println("Event TPUART_RESET_INDICATION");
-#endif
+            //TPUART_DEBUG_PORT.println("Event TPUART_RESET_INDICATION");
             return TPUART_RESET_INDICATION;
         } else {
             serialRead();
-#if defined(TPUART_DEBUG)
-            TPUART_DEBUG_PORT.println("Event UNKNOWN");
-#endif
+            //TPUART_DEBUG_PORT.print("Event UNKNOWN. Control Field: bin=");
+            //TPUART_DEBUG_PORT.println(incomingByte, BIN);
             return UNKNOWN;
         }
     }
-#if defined(TPUART_DEBUG)
-    TPUART_DEBUG_PORT.println("Event UNKNOWN");
-#endif
+    //TPUART_DEBUG_PORT.println("##### KnxTpUart::serialEvent() No data from serial port available?");
     return UNKNOWN;
 }
 
-
+// check for L_DATA.ind, TPUART chapter 3.2.3.2
 bool KnxTpUart::isKNXControlByte(int b) {
-    return ( (b | B00101100) == B10111100 ); // Ignore repeat flag and priority flag
+    return ( (b | B00101100) /*forces to set repeat+prio flags in incoming byte*/ == B10111100 /* check whether bit 7 and 4 is set to 1*/); // Ignore repeat flag and priority flag
 }
 
 void KnxTpUart::checkErrors() {
 #if defined(TPUART_DEBUG)
 #if defined(_SAM3XA_)  // For DUE
     if (USART1->US_CSR & US_CSR_OVRE) {
-        TPUART_DEBUG_PORT.println("Overrun"); 
+        //TPUART_DEBUG_PORT.println("Overrun"); 
     }
 
     if (USART1->US_CSR & US_CSR_FRAME) {
-        TPUART_DEBUG_PORT.println("Frame Error");
+        //TPUART_DEBUG_PORT.println("Frame Error");
     }
 
     if (USART1->US_CSR & US_CSR_PARE) {
-        TPUART_DEBUG_PORT.println("Parity Error");
+        //TPUART_DEBUG_PORT.println("Parity Error");
     }
 #elif defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // for UNO
     if (UCSR0A & B00010000) {
-        TPUART_DEBUG_PORT.println("Frame Error"); 
+        //TPUART_DEBUG_PORT.println("Frame Error"); 
     }
     
     if (UCSR0A & B00000100) {
-        TPUART_DEBUG_PORT.println("Parity Error"); 
+        //TPUART_DEBUG_PORT.println("Parity Error"); 
     }
 #else
     if (UCSR1A & B00010000) {
-        TPUART_DEBUG_PORT.println("Frame Error"); 
+        //TPUART_DEBUG_PORT.println("Frame Error"); 
     }
     
     if (UCSR1A & B00000100) {
-        TPUART_DEBUG_PORT.println("Parity Error"); 
+        //TPUART_DEBUG_PORT.println("Parity Error"); 
     }
 #endif
 #endif
@@ -117,26 +113,32 @@ void KnxTpUart::checkErrors() {
 
 void KnxTpUart::printByte(int incomingByte) {
 #if defined(TPUART_DEBUG)
-    TPUART_DEBUG_PORT.print("Incoming Byte: ");
-    TPUART_DEBUG_PORT.print(incomingByte, DEC);
-    TPUART_DEBUG_PORT.print(" - ");
-    TPUART_DEBUG_PORT.print(incomingByte, HEX);
-    TPUART_DEBUG_PORT.print(" - ");
-    TPUART_DEBUG_PORT.print(incomingByte, BIN);
-    TPUART_DEBUG_PORT.println();
+    //TPUART_DEBUG_PORT.print("Incoming Byte: ");
+    //TPUART_DEBUG_PORT.print(incomingByte, DEC);
+    //TPUART_DEBUG_PORT.print(" - ");
+    //TPUART_DEBUG_PORT.print(incomingByte, HEX);
+    //TPUART_DEBUG_PORT.print(" - ");
+    //TPUART_DEBUG_PORT.print(incomingByte, BIN);
+    //TPUART_DEBUG_PORT.println();
 #endif
 }
 
 bool KnxTpUart::readKNXTelegram() {
+//    TPUART_DEBUG_PORT.println("##### KnxTpUart::readKNXTelegram() BEGIN");
+
+    // clear first
+    _tg->clear();
+
     // Receive header
     for (int i = 0; i < 6; i++) {
         _tg->setBufferByte(i, serialRead());
     }
-
+/*
 #if defined(TPUART_DEBUG)
     TPUART_DEBUG_PORT.print("Payload Length: ");
     TPUART_DEBUG_PORT.println(_tg->getPayloadLength());
 #endif
+*/
     int bufpos = 6;
     for (int i = 0; i < _tg->getPayloadLength(); i++) {
         _tg->setBufferByte(bufpos, serialRead());
@@ -148,10 +150,10 @@ bool KnxTpUart::readKNXTelegram() {
 
 #if defined(TPUART_DEBUG)
     // Print the received telegram
-    _tg->print(&TPUART_DEBUG_PORT);
+//    _tg->print(&TPUART_DEBUG_PORT);
 #endif
 
-    // get targetaddress if telegram
+    // get targetaddress of telegram
     byte target[2];
     _tg->getTarget(target);
 
@@ -165,6 +167,11 @@ bool KnxTpUart::readKNXTelegram() {
     // Broadcast (Programming Mode)
     bool interestedBC = (_listen_to_broadcasts && _tg->isBroadcast());
 
+/*
+    TPUART_DEBUG_PORT.print("IstargetGroup: ");
+    TPUART_DEBUG_PORT.println(!_tg->isTargetGroup());
+
+
     TPUART_DEBUG_PORT.print("Interested GA: ");
     TPUART_DEBUG_PORT.println(interestedGA);
     TPUART_DEBUG_PORT.print("Interested PA: ");
@@ -172,12 +179,12 @@ bool KnxTpUart::readKNXTelegram() {
     TPUART_DEBUG_PORT.print("Interested BC: ");
     TPUART_DEBUG_PORT.println(interestedBC);
     
-    TPUART_DEBUG_PORT.print("target: [0]=");
-    TPUART_DEBUG_PORT.print(target[0]);
-    TPUART_DEBUG_PORT.print(" [1]=");
-    TPUART_DEBUG_PORT.print(target[1]);
+    TPUART_DEBUG_PORT.print("target: [0]=0x");
+    TPUART_DEBUG_PORT.print(target[0], HEX);
+    TPUART_DEBUG_PORT.print(" [1]=0x");
+    TPUART_DEBUG_PORT.print(target[1], HEX);
     TPUART_DEBUG_PORT.println();
-
+*/
     bool interested = interestedGA || interestedPA ||interestedBC;
 
     if (interested) {
@@ -186,22 +193,87 @@ bool KnxTpUart::readKNXTelegram() {
         sendNotAddressed();
     }
 
-    if (_tg->getCommunicationType() == KNX_COMM_UCD) {
-#if defined(TPUART_DEBUG)
-      TPUART_DEBUG_PORT.println("UCD Telegram received");
-#endif
-    } else if (_tg->getCommunicationType() == KNX_COMM_NCD) {
-#if defined(TPUART_DEBUG)
-        TPUART_DEBUG_PORT.print("NCD Telegram ");
-        TPUART_DEBUG_PORT.print(_tg->getSequenceNumber());
-        TPUART_DEBUG_PORT.println(" received");
-#endif
-        if (interested) {
-            sendNCDPosConfirm(_tg->getSequenceNumber(), PA_INTEGER(_tg->getSourceArea(), _tg->getSourceLine(), _tg->getSourceMember()));
-        }
+    int commType = _tg->getCommunicationType();
+    int controlData = _tg->getControlData();
+    
+    int area = _tg->getSourceArea();
+    int line = _tg->getSourceLine();
+    int member = _tg->getSourceMember();
+    
+    int seqNr = _tg->getSequenceNumber();
+    
+    byte source[2];
+    source[0] = (area << 4) | line;
+    source[1] = member;
+    
+    switch (commType) {
+
+        case KNX_COMM_UDP:
+        break;
+    
+        case KNX_COMM_NDP:
+/*
+            TPUART_DEBUG_PORT.print("NDP Telegram seqnr=");
+            TPUART_DEBUG_PORT.print(seqNr);
+            TPUART_DEBUG_PORT.println(" received.");
+*/            
+            if (interested) {
+                boolean success =  sendTransportDataAckPDU(seqNr, source);
+/*
+                if (success) {
+                    TPUART_DEBUG_PORT.println("sendTransportDataAckPDU = success");
+                } else {
+                    TPUART_DEBUG_PORT.println("sendTransportDataAckPDU = F A I L E D");
+                }                
+*/                
+            }
+        break;
+
+        case KNX_COMM_UCD:
+/*
+            TPUART_DEBUG_PORT.print("UCD Telegram received: ");
+            
+            switch(controlData) {
+                case KNX_CONTROLDATA_CONNECT:
+                    TPUART_DEBUG_PORT.println("CONNECT");
+                break;
+
+                case KNX_CONTROLDATA_DISCONNECT:
+                    TPUART_DEBUG_PORT.println("DISCONNECT");
+                break;
+
+                default:
+                    TPUART_DEBUG_PORT.print("Unusual control data for UCD: bin=");
+                    TPUART_DEBUG_PORT.println(controlData, BIN);
+            }
+*/
+        break;
+        
+        case KNX_COMM_NCD:
+
+/*
+            TPUART_DEBUG_PORT.print("NCD Telegram seqnr=");
+            TPUART_DEBUG_PORT.print(seqNr);
+            TPUART_DEBUG_PORT.println(" received.");
+*/            
+
+            if (interested) {
+                boolean success = sendTransportDataAckPDU(seqNr, source);
+/*
+                if (success) {
+                    TPUART_DEBUG_PORT.println("sendTransportDataAckPDU = success");
+                } else {
+                    TPUART_DEBUG_PORT.println("sendTransportDataAckPDU = F A I L E D");
+                }
+*/                
+            }        
+        break;
+        
     }
     
     // Returns if we are interested in this diagram
+    //TPUART_DEBUG_PORT.print("##### KnxTpUart::readKNXTelegram() END. Interested=");
+    //TPUART_DEBUG_PORT.println(interested);
     return interested;
 }
 
@@ -330,37 +402,44 @@ bool KnxTpUart::individualAnswerAuth(int accessLevel, int sequenceNo, int area, 
     return sendMessage();
 }
 
-void KnxTpUart::createKNXMessageFrame(int payloadlength, KnxCommandType command, byte groupAddress[2], int firstDataByte) {
-    _tg->clear();
-    _tg->setSourceAddress(_individualAddress);
-    _tg->setTargetGroupAddress(groupAddress);
-    _tg->setFirstDataByte(firstDataByte);
-    _tg->setCommand(command);
-    _tg->setPayloadLength(payloadlength);
-    _tg->createChecksum();
-}
-
-void KnxTpUart::createKNXMessageFrameIndividual(int payloadlength, KnxCommandType command, byte targetIndividualAddress[2], int firstDataByte) {
-    _tg->clear();
-    _tg->setSourceAddress(_individualAddress);
-    _tg->setTargetIndividualAddress(targetIndividualAddress);
-    _tg->setFirstDataByte(firstDataByte);
-    _tg->setCommand(command);
-    _tg->setPayloadLength(payloadlength);
-    _tg->createChecksum();
-}
-
-bool KnxTpUart::sendNCDPosConfirm(int sequenceNo, byte targetIndividualAddress[2]) {
+bool KnxTpUart::sendPropertyResponse(int objIndex, int propId, int start, int elements, byte data[], int sequenceNo, int area, int line, int member) {
+    int payload = 2+4+elements;
+    
+    // PA_INTEGER Macro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
+    // Method execution seems to stop and default value (false?) is returned. Se we calc it ourselves.
+    byte target[2];
+    target[0] = (area << 4) | line;
+    target[1] = member;
+     
+    /*
+        it's important to use "another telegram". If one just uses _tg for the answer, this conflicts...
+        One has to use "another" telegram. _tg_ptp is already there for this scenarios
+    */
+    
     _tg_ptp->clear();
     _tg_ptp->setSourceAddress(_individualAddress);
-    _tg_ptp->setTargetIndividualAddress(targetIndividualAddress);
+    _tg_ptp->setTargetIndividualAddress(target);
+
+    _tg_ptp->setCommand(KNX_COMMAND_ESCAPE);
+    _tg_ptp->setFirstDataByte(KNX_EXT_COMMAND_PROP_ANSWER);
+
+    _tg_ptp->setPayloadLength(payload);   
+    
+    _tg_ptp->setCommunicationType(KNX_COMM_NDP);
     _tg_ptp->setSequenceNumber(sequenceNo);
-    _tg_ptp->setCommunicationType(KNX_COMM_NCD);
-    _tg_ptp->setControlData(KNX_CONTROLDATA_POS_CONFIRM);
-    _tg_ptp->setPayloadLength(1);
+    
+    _tg_ptp->setBufferByte(8, objIndex);
+    _tg_ptp->setBufferByte(9, propId);
+    // from Calimero-Source: asdu[2] = (byte) ((elements << 4) | ((start >>> 8) & 0xF));
+    _tg_ptp->setBufferByte(10, ((elements << 4) | ((start >> 8) & 0xF)));
+    _tg_ptp->setBufferByte(11, start & 0xff);
+    
+    for (int i = 0; i < elements; i++) {
+        _tg_ptp->setBufferByte(12+i, data[i]);
+    }
+    
     _tg_ptp->createChecksum();
-    
-    
+       
     int messageSize = _tg_ptp->getTotalLength();
     
     uint8_t sendbuf[2];
@@ -394,7 +473,146 @@ bool KnxTpUart::sendNCDPosConfirm(int sequenceNo, byte targetIndividualAddress[2
     return false;
 }
 
+
+bool KnxTpUart::sendMemoryReadResponse(int start, int length, byte data[], int seqNr, int area, int line, int member) {
+    int payload = 2+2+length;
+    
+    // PA_INTEGER Macro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
+    // Method execution seems to stop and default value (false?) is returned. Se we calc it ourselves.
+    byte target[2];
+    target[0] = (area << 4) | line;
+    target[1] = member;
+     
+    
+    _tg_ptp->clear();
+    _tg_ptp->setSourceAddress(_individualAddress);
+    _tg_ptp->setTargetIndividualAddress(target);
+
+    _tg_ptp->setCommand(KNX_COMMAND_MEM_ANSWER);
+    
+    _tg_ptp->setPayloadLength(payload);   
+    
+    _tg_ptp->setCommunicationType(KNX_COMM_NDP);
+    _tg_ptp->setSequenceNumber(seqNr);
+    
+    // B0100000 --> mem response
+    _tg_ptp->setBufferByte(7, B01000000 | length);
+    
+    _tg_ptp->setBufferByte(8, start>>8);
+    _tg_ptp->setBufferByte(9, start&0xff);
+    
+    for (int i = 0; i < length; i++) {
+        _tg_ptp->setBufferByte(10+i, data[i]);
+    }
+    
+    _tg_ptp->createChecksum();
+    
+    Serial.print("MemRead Answer Dump: ");
+    _tg_ptp->print(&Serial);
+    
+    _tg_ptp->createChecksum();
+       
+    int messageSize = _tg_ptp->getTotalLength();
+    
+    uint8_t sendbuf[2];
+    for (int i = 0; i < messageSize; i++) {
+        if (i == (messageSize - 1)) {
+            sendbuf[0] = TPUART_DATA_END;
+        } else {
+            sendbuf[0] = TPUART_DATA_START_CONTINUE;
+        }
+        
+        sendbuf[0] |= i;
+        sendbuf[1] = _tg_ptp->getBufferByte(i);
+        
+        _serialport->write(sendbuf, 2);
+    }
+    
+    
+    int confirmation;
+    while(true) {
+        confirmation = serialRead();
+        if (confirmation == B10001011) {
+            return true; // Sent successfully
+        } else if (confirmation == B00001011) {
+            return false;
+        } else if (confirmation == -1) {
+            // Read timeout
+            return false;
+        }
+    }
+    
+    return false;
+}
+
+
+void KnxTpUart::createKNXMessageFrame(int payloadlength, KnxCommandType command, byte groupAddress[2], int firstDataByte) {
+    _tg->clear();
+    _tg->setSourceAddress(_individualAddress);
+    _tg->setTargetGroupAddress(groupAddress);
+    _tg->setFirstDataByte(firstDataByte);
+    _tg->setCommand(command);
+    _tg->setPayloadLength(payloadlength);
+    _tg->createChecksum();
+}
+
+void KnxTpUart::createKNXMessageFrameIndividual(int payloadlength, KnxCommandType command, byte targetIndividualAddress[2], int firstDataByte) {
+    _tg->clear();
+    _tg->setSourceAddress(_individualAddress);
+    _tg->setTargetIndividualAddress(targetIndividualAddress);
+    _tg->setFirstDataByte(firstDataByte);
+    _tg->setCommand(command);
+    _tg->setPayloadLength(payloadlength);
+    _tg->createChecksum();
+}
+
+/*
+ * Sends T_DATA_ACK_PDU
+ */
+bool KnxTpUart::sendTransportDataAckPDU(int sequenceNo, byte targetIndividualAddress[2]) {
+    _tg_ptp->clear();
+    _tg_ptp->setSourceAddress(_individualAddress);
+    _tg_ptp->setTargetIndividualAddress(targetIndividualAddress);
+    _tg_ptp->setSequenceNumber(sequenceNo);
+    _tg_ptp->setCommunicationType(KNX_COMM_NCD);
+    _tg_ptp->setControlData(KNX_CONTROLDATA_POS_CONFIRM);
+    _tg_ptp->setPayloadLength(1);
+    _tg_ptp->createChecksum();
+    
+    int messageSize = _tg_ptp->getTotalLength();
+    
+    uint8_t sendbuf[2];
+    for (int i = 0; i < messageSize; i++) {
+        if (i == (messageSize - 1)) {
+            sendbuf[0] = TPUART_DATA_END;
+        } else {
+            sendbuf[0] = TPUART_DATA_START_CONTINUE;
+        }
+        
+        sendbuf[0] |= i;
+        sendbuf[1] = _tg_ptp->getBufferByte(i);
+        
+        _serialport->write(sendbuf, 2);
+    }
+    
+    int confirmation;
+    while(true) {
+        confirmation = serialRead();
+        if (confirmation == B10001011) {
+            return true; // Sent successfully
+        } else if (confirmation == B00001011) {
+            return false;
+        } else if (confirmation == -1) {
+            // Read timeout
+            return false;
+        }
+    }
+    
+    return false;
+}
+
 bool KnxTpUart::sendMessage() {
+
     int messageSize = _tg->getTotalLength();
 
     uint8_t sendbuf[2];
@@ -408,17 +626,17 @@ bool KnxTpUart::sendMessage() {
         sendbuf[0] |= i;
         sendbuf[1] = _tg->getBufferByte(i);
         
-        _serialport->write(sendbuf, 2);
+        int sent = _serialport->write(sendbuf, 2);
     }
 
 
     int confirmation;
     while(true) {
         confirmation = serialRead();
-        if (confirmation == B10001011) {
+        if (confirmation == B10001011) {        // L_DATA.confirm, positive confirm, TPUART Chapter 3.2.3.2
             delay (SERIAL_WRITE_DELAY_MS);
             return true; // Sent successfully
-        } else if (confirmation == B00001011) {
+        } else if (confirmation == B00001011) { // L_DATA.confirm, negative confirm, TPUART Chapter 3.2.3.2
             delay (SERIAL_WRITE_DELAY_MS);
             return false;
         } else if (confirmation == -1) {
@@ -431,26 +649,32 @@ bool KnxTpUart::sendMessage() {
     return false;
 }
 
+/*
+ * Sends ACK control byte to TPUART. This is not sent to KNX bus...
+ */
 void KnxTpUart::sendAck() {
-    TPUART_DEBUG_PORT.print("Send ACK");
+    /* 
+        See http://www.hqs.sbt.siemens.com/cps_product_data/gamma-b2b/tpuart.pdf , Page 13, U_AckInformation-Service
+        00010001 means: Acknowledged telegram that was addressed to us.
+     */
     byte sendByte = B00010001;
     _serialport->write(sendByte);
     delay(SERIAL_WRITE_DELAY_MS);
 }
 
 void KnxTpUart::sendNotAddressed() {
+    /* 
+        See http://www.hqs.sbt.siemens.com/cps_product_data/gamma-b2b/tpuart.pdf , Page 13, U_AckInformation-Service
+        00010000 means: Acknowledged telegram that was NOT addressed to us.
+     */
     byte sendByte = B00010000;
     _serialport->write(sendByte);
     delay(SERIAL_WRITE_DELAY_MS);
 }
 
 int KnxTpUart::serialRead() {
-    unsigned long startTime = millis();
-#if defined(TPUART_DEBUG)
-    TPUART_DEBUG_PORT.print("Available: ");
-    TPUART_DEBUG_PORT.println(_serialport->available());
-#endif
     
+    unsigned long startTime = millis();
     while (! (_serialport->available() > 0)) {
         if (abs(millis() - startTime) > SERIAL_READ_TIMEOUT_MS) {
             // Timeout
@@ -464,7 +688,7 @@ int KnxTpUart::serialRead() {
     
     int inByte = _serialport->read();
     checkErrors();
-    printByte(inByte);
+//    printByte(inByte);
     
     return inByte;
 }
@@ -472,7 +696,7 @@ int KnxTpUart::serialRead() {
 void KnxTpUart::addListenGroupAddress(byte address[]) {
     if (_listen_group_address_count >= MAX_LISTEN_GROUP_ADDRESSES) {
 #if defined(TPUART_DEBUG)
-        TPUART_DEBUG_PORT.println("Already listening to MAX_LISTEN_GROUP_ADDRESSES, cannot listen to another");
+        //TPUART_DEBUG_PORT.println("Already listening to MAX_LISTEN_GROUP_ADDRESSES, cannot listen to another");
 #endif
         return;
     }
