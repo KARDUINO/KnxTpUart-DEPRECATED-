@@ -9,7 +9,7 @@
 
 
 // Start with default PA
-KnxTpUart knx(&Serial1, PA_INTEGER(15,15,20));
+KnxTpUart knx(&Serial1, PA_INTEGER(1,1,251));
 KnxDevice knxDevice(&knx);
 
 
@@ -28,7 +28,8 @@ void setup() {
     Serial1.begin(19200);
     UCSR1C = UCSR1C | B00100000; // Even Parity
     knx.uartReset(); 
-    
+    knx.addListenGroupAddress(GA_INTEGER(7,7,7));
+    Serial.println("Running ....");
 }
 
 
@@ -37,7 +38,6 @@ void setup() {
  * Main Program Loop
  */
 void loop(){
-   
    knxDevice.loop();
 }
 
@@ -55,8 +55,8 @@ void serialEvent1() {
 
     switch(knxEventType) {
 
-    case KNX_TELEGRAM:     
-        Serial.println("it's a KNX telegram...");
+    case KNX_TELEGRAM:           
+     
         break;
       
     default:

@@ -80,7 +80,10 @@ void KnxTelegram::setTargetIndividualAddress(byte targetIndividualAddress[2]) {
     buffer[5] = buffer[5] & B01111111;
 }
 
-// Is the target a GA? If not, it's a PA
+/*
+ * Is the target a GA? If not, it's a PA
+ * Octet 5 Bit 8, Transport Control Field
+ */
 bool KnxTelegram::isTargetGroup() {
     return buffer[5] & B10000000;
 }
@@ -141,6 +144,82 @@ int KnxTelegram::getPayloadLength() {
     return length;
 }
 
+ApplicationControlField KnxTelegram::getApplicationControlField() {
+
+    ApplicationControlField result = A_UNKNOWN;
+
+    // first four bits: octet 6 bit 1+2 PLUS octet 7 bit 7+8
+    int bits4 = ((buffer[6] & B00000011) << 2) | ((buffer[7] & B11000000) >> 6);
+    // following 6 bits: octet 7 bit 1-7
+    int bits6 = (buffer[7] & B00111111);
+
+    switch (bits4) {
+
+        // GROUP
+        case B0000:    
+            result = A_GROUPVALUE_READ;
+            break;
+        case B0001:
+            result = A_GROUPVALUE_RESPONSE;
+            break;
+        case B0010:
+            result = A_GROUPVALUE_WRITE;
+            break;
+            
+        // PHYSICAL
+        case B0011:
+            if (bits6 == B000000) result = A_PHYSICALADDRESS_WRITE;
+            break;
+        case B0100:
+            if (bits6 == B000000) result = A_PHYSICALADDRESS_READ;
+            break;
+        case B0101:
+            if (bits6 == B000000) result = A_PHYSICALADDRESS_RESPONSE;
+            break;
+            
+        case B1111:
+            // PROPERTY    
+            if (bits6 == B010101) result = A_PROPERTYVALUE_READ;
+            else
+            if (bits6 == B010110) result = A_PROPERTYVALUE_RESPONSE;
+            else
+            if (bits6 == B010111) result = A_PROPERTYVALUE_WRITE;
+            else
+            // AUTHORIZE
+            if (bits6 == B010001) result = A_AUTHORIZE_REQUEST;
+            else
+            if (bits6 == B010010) result = A_AUTHORIZE_RESPONSE;
+            break;
+            
+        // MEMORY    
+        case B1000:
+            if ((bits6 & B110000) == B00) result = A_MEMORY_READ;
+            break;            
+        case B1001:
+            if ((bits6 & B110000) == B00) result = A_MEMORY_RESPONSE;
+            break;            
+        case B1010:
+            if ((bits6 & B110000) == B00) result = A_MEMORY_WRITE;
+            break;            
+
+        // DEVICE DESCRIPTOR    
+        case B1100:
+            if (bits6 == B000000) result = A_DEVICEDESCRIPTOR_READ;
+            break;
+        case B1101:
+            if (bits6 == B000000) result = A_DEVICEDESCRIPTOR_RESPONSE;
+            break;
+            
+        // RESTART    
+        case B1110:
+            if (bits6 == B000000) result = A_RESTART;
+            
+
+    }
+            
+    return result;
+}
+
 void KnxTelegram::setCommand(KnxCommandType command) {
     buffer[6] = buffer[6] & B11111100; // erase first two bits
     buffer[7] = buffer[7] & B00111111; // erase last two bits
@@ -167,6 +246,9 @@ void KnxTelegram::setControlData(KnxControlDataType cd) {
     buffer[6] = buffer[6] | cd;
 }
 
+/*
+ * Octet 6, part of "Transport Control Field"
+ */
 KnxControlDataType KnxTelegram::getControlData() {
     return (KnxControlDataType) (buffer[6] & B00000011);
 }
@@ -214,7 +296,18 @@ bool KnxTelegram::verifyChecksum() {
 }
 
 void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
-#if defined(TPUART_DEBUG)
+//#if defined(TPUART_DEBUG)
+    serial->println("##### DUMP START #####");
+
+    for (int i = 0; i < MAX_KNX_TELEGRAM_SIZE; i++) {
+        serial->print("buffer[");
+        serial->print(i);
+        serial->print("] hex=");
+        serial->print(buffer[i], HEX);
+        serial->print(" \tbin=");
+        serial->println(buffer[i], BIN);
+    }
+
     serial->print("Repeated: ");
     serial->println(isRepeated());
 
@@ -244,22 +337,32 @@ void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
         serial->println(getTargetMember());
     }
         
+    serial->print("Control Data: bin=");
+    serial->println(getControlData(), BIN);
+
     serial->print("Routing Counter: ");
     serial->println(getRoutingCounter());
 
     serial->print("Payload Length: ");
-    serial->println(getPayloadLength());
+    serial->println(getPayloadLength());   
 
-    serial->print("Command: ");
-    serial->println(getCommand());
+    serial->print("Command: hex=");
+    serial->print(getCommand(), HEX);
+    serial->print(" bin=");
+    serial->println(getCommand(), BIN);
 
-    serial->print("First Data Byte: ");
-    serial->println(getFirstDataByte());
+    serial->print("First Data Byte  hex=");
+    serial->print(getFirstDataByte(), HEX);
+    serial->print("\tbin=");
+    serial->println(getFirstDataByte(), BIN);
+
 
     for (int i = 2; i < getPayloadLength(); i++) {
         serial->print("Data Byte ");
         serial->print(i);
-        serial->print(": ");
+        serial->print("      hex=");
+        serial->print(buffer[6+i], HEX);
+        serial->print("\tbin=");
         serial->println(buffer[6+i], BIN);
     }
 
@@ -271,7 +374,8 @@ void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
         serial->println(getChecksum(), BIN);
         serial->println(calculateChecksum(), BIN);
     }
-#endif
+    serial->println("##### DUMP END #####");
+//#endif
 }
 
 int KnxTelegram::calculateChecksum() {
@@ -495,21 +599,42 @@ void KnxTelegram::setKNXTime(int day, int hours, int minutes, int seconds) {
  * Property / Memory Access stuff
  */
 
-int KnxTelegram::getPropertyObject(){
-    return 0;
+int KnxTelegram::getPropertyObjIndex(){
+    return buffer[8];
 }
 
-int KnxTelegram::getPropertyId() {
-    return 0;
+int KnxTelegram::getPropertyPropId() {
+    return buffer[9];
 }
 
-int KnxTelegram::getPropertyCount() {
-    return 1;
+int KnxTelegram::getPropertyElements() {
+    //asdu[2] = (byte) ((elements << 4) | ((start >>> 8) & 0xF));
+    return buffer[10]>>4;
 }
 
-void KnxTelegram::getPropertyData(byte* data) {
-    for (int i=0;i<getPropertyCount();i++){
-        data[i] = 0xff;
+int KnxTelegram::getPropertyStart() {
+    return (buffer[10]&0x0F)<<8 | buffer[11];
+}
+
+void KnxTelegram::getPropertyData(byte data[]) {
+    for (int i=0;i<getPropertyElements();i++){
+        data[i] = buffer[12+i];
     }
 }
+
+int KnxTelegram::getMemoryLength() {
+    return getFirstDataByte();
+}
+
+unsigned int KnxTelegram::getMemoryStart() {
+    return (buffer[8] << 8 | buffer[9]) & 0xffff;
+}
+
+void KnxTelegram::getMemoryData(byte data[]) {
+    for (int i=0;i<getMemoryLength();i++){
+        data[i] = buffer[10+i];
+    }
+}
+
+
 
