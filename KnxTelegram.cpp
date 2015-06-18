@@ -1,8 +1,10 @@
+#include "DebugLog.h"
 #include "KnxTpUart.h"
 #include "KnxTelegram.h"
 
 KnxTelegram::KnxTelegram() {
     clear();
+    CONSOLEDEBUG("tpm")
 }
 
 void KnxTelegram::clear() {
@@ -216,7 +218,7 @@ ApplicationControlField KnxTelegram::getApplicationControlField() {
             if (bits6 == B000000) result = A_RESTART;
             
 		default:
-			DEBUG_TRACE("Unhandled ApplicationControlField: 4bit: %02x 6bit: %02x", bits4, bits6);
+			//DEBUG_TRACE("Unhandled ApplicationControlField: 4bit: %02x 6bit: %02x", bits4, bits6);
 			break;
 
     }

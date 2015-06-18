@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
+
 #define DEBUG
 #define DEBUGLEVEL_INFO
 
+#include <DebugLog.h>
 // für den KNX Zugriff
 #include <KnxTelegram.h>
 #include <KnxTpUart.h>
@@ -34,7 +36,8 @@ void setup() {
 	
     knx.addListenGroupAddress(GA_INTEGER(7,7,7));
 	
-    DEBUG_INFO("Running ....");
+    Serial.print("Running ....");
+
 }
 
 
@@ -57,7 +60,8 @@ void serialEvent1() {
 
     // forward the event processing to KNX Software Device
     KnxTpUartSerialEventType knxEventType = knxDevice.serialEvent();
-
+//CONSOLEDEBUG("1")
+//DEBUG_INFO("2")
     switch(knxEventType) {
 
     case KNX_TELEGRAM:           

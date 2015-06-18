@@ -1,5 +1,12 @@
-#include "KnxDevice.h"
+#include <avr/wdt.h>
 #include "EEPROM.h"
+#define DEBUG
+#define DEBUGLEVEL_INFO
+#include "DebugLog.h"
+#include "KnxTpUart.h"
+#include "KnxDevice.h"
+
+
 
 // Index of Individual Address (PA) in EEPROM
 #define EEPROM_INDEX_PA 0
@@ -7,15 +14,8 @@
 #define PIN_PROG_LED 13
 
 // -------- DON'T CHANGE ANYTHING BELOW THIS LINE ---------------------------
- 
-
- 
 
 
-
-#if defined(DEBUG)
-
-#endif
 
 
 KnxDevice::KnxDevice(KnxTpUart* knxTpUart) {
@@ -24,7 +24,7 @@ KnxDevice::KnxDevice(KnxTpUart* knxTpUart) {
     _lastProgButtonValue = 0;
 
     // for testing only
-    setProgrammingMode(true);
+//    setProgrammingMode(true);
 }
 
 void KnxDevice::loop() {
@@ -43,7 +43,8 @@ void KnxDevice::loop() {
  * Enable or disable programming mode
  */
 void KnxDevice::setProgrammingMode(bool on) {
-    DEBUG_INFO("setProgrammingMode: %i", on);
+    DEBUG_INFO("setProgrammingMode:")
+    DEBUG_INFO(on);
     _programmingMode = on;
     digitalWrite(PIN_PROG_LED, on);
     _knxTpUart->setListenToBroadcasts(on);
@@ -94,7 +95,14 @@ void KnxDevice::processTelegram() {
                 int line = telegram->getBufferByte(8) & B00001111;
                 int member = telegram->getBufferByte(9);
                 
-                DEBUG_INFO("A_PHYSICALADDRESS_WRITE: %i.%i.%i", area, line, member);                
+#ifdef DEBUGLEVEL_DEBUG  
+                Serial.print("A_PHYSICALADDRESS_WRITE:);
+                Serial.print(area);
+                Serial.print(".");
+                Serial.print(line);
+                Serial.print(".");
+                Serial.println(member);
+#endif
                 
                 _knxTpUart->setIndividualAddress(PA_INTEGER(area, line, member));
                 
@@ -168,14 +176,21 @@ void KnxDevice::processTelegram() {
             if (_programmingMode) {
                 // Restart the device -> end programming mode
                 setProgrammingMode(false);
-                DEBUG_INFO("Received restart, ending programming mode"); 
+                Serial.println("Received restart, ending programming mode"); 
             }
+
+            wdt_enable(WDTO_15MS);
+            while(1) { 
+                // loop as fast as you can
+            }
+            Serial.println("XXXXXXXXXXXXXXXXXXXXXXXX"); 
             break;    
             
 
             
         default:
-            DEBUG_INFO("Unhandled APCI: %i", apci);
+            DEBUG_INFO("Unhandled APCI:");
+            DEBUG_INFO(apci);
             break;
             
     }
@@ -217,7 +232,8 @@ void KnxDevice::processCommandMemRead(KnxTelegram* telegram) {
     
     bool result = _knxTpUart->sendMemoryReadResponse(start, length, data, seqNr, area, line, member);
     
-    DEBUG_DEBUG("Result=%i", result);
+    DEBUG_DEBUG("Result=")
+    DEBUG_DEBUG(result);
     
 }
 

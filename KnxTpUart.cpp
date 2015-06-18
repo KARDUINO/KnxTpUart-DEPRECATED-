@@ -1,5 +1,5 @@
+#include "DebugLog.h"
 #include "KnxTpUart.h"
-
 KnxTpUart::KnxTpUart(TPUART_SERIAL_CLASS* sport, byte address[2]) {
     _serialport = sport;
     
@@ -10,6 +10,7 @@ KnxTpUart::KnxTpUart(TPUART_SERIAL_CLASS* sport, byte address[2]) {
     _tg = new KnxTelegram();
     _tg_ptp = new KnxTelegram();
     _listen_to_broadcasts = false;
+    CONSOLEDEBUG("tpm")
 }
 
 void KnxTpUart::setListenToBroadcasts(bool listen) {

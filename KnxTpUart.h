@@ -10,40 +10,7 @@
 // Debug-Stuff
 
 // enable/disable log-levels
-#ifdef DEBUGLEVEL_INFO
-#define DEBUG_INFO(...) CONSOLEDEBUG(__VA_ARGS__)
-#else
-#define DEBUG_INFO(...)
-#endif
 
-#ifdef DEBUGLEVEL_DEBUG
-#define DEBUG_DEBUG(...) CONSOLEDEBUG(__VA_ARGS__)
-#else
-#define DEBUG_DEBUG(...)
-#endif
-
-#ifdef DEBUGLEVEL_TRACE
-#define DEBUG_TRACE(...) CONSOLEDEBUG(__VA_ARGS__)
-#else
-#define DEBUG_TRACE(...)
-#endif
-
-// enable/disable general debugging
-#ifdef DEBUG
-#define CONSOLEDEBUG(...)  \
-	Serial.print(millis());     \
-	Serial.print(": ");    \
-	Serial.print(__PRETTY_FUNCTION__); \
-	Serial.print(' ');      \
-	Serial.print(__FILE__);     \
-	Serial.print(':');      \
-	Serial.print(__LINE__);     \
-	Serial.print(' '); \
-	sprintf (consolebuffer, __VA_ARGS__); Serial.println(consolebuffer);
-char consolebuffer[120];
-#else
-#define CONSOLEDEBUG(...) 
-#endif
 // --------------------------------------------
 
 
