@@ -4,6 +4,7 @@
 
 #define DEBUG
 #define DEBUGLEVEL_INFO
+#define DEBUGLEVEL_TRACE
 
 #include <DebugLog.h>
 // für den KNX Zugriff
@@ -15,7 +16,7 @@
 
 // Start with default PA
 KnxTpUart knx(&Serial1, PA_INTEGER(1,1,251));
-KnxDevice knxDevice(&knx);
+KnxDevice knxDevice(&knx, false);
 
 
 /* *******************************************

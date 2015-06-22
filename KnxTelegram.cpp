@@ -302,7 +302,7 @@ bool KnxTelegram::verifyChecksum() {
 }
 
 void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
-#if defined(DEBUGLEVEL_TRACE)
+//#if defined(DEBUGLEVEL_TRACE)
     serial->println("##### DUMP START #####");
 
     for (int i = 0; i < MAX_KNX_TELEGRAM_SIZE; i++) {
@@ -381,7 +381,7 @@ void KnxTelegram::print(TPUART_SERIAL_CLASS* serial) {
         serial->println(calculateChecksum(), BIN);
     }
     serial->println("##### DUMP END #####");
-#endif
+//#endif
 }
 
 int KnxTelegram::calculateChecksum() {

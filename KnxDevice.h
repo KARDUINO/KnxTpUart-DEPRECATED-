@@ -8,7 +8,7 @@
 
 class KnxDevice {
 public:
-    KnxDevice(KnxTpUart*);
+    KnxDevice(KnxTpUart*, bool authRequired);
     KnxTpUartSerialEventType serialEvent();
     
     void loop();
@@ -16,6 +16,11 @@ public:
 private:
     bool _programmingMode;
     int _lastProgButtonValue;
+    // Flag that sets "authorization required for access"
+    bool _authRequired;
+    
+    // current authorization status
+    bool _authorized;
 
     KnxTpUart* _knxTpUart;
 

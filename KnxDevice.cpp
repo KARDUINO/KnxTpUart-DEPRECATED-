@@ -18,11 +18,16 @@
 
 
 
-KnxDevice::KnxDevice(KnxTpUart* knxTpUart) {
+KnxDevice::KnxDevice(KnxTpUart* knxTpUart, bool authRequired) {
     _knxTpUart = knxTpUart;
     _programmingMode = false;
     _lastProgButtonValue = 0;
-
+    _authRequired = authRequired;
+    
+    // if no authorization is required, set "all is authorized"
+    if (!_authRequired) {
+        _authorized = true;
+    }
     // for testing only
 //    setProgrammingMode(true);
 }
@@ -48,6 +53,12 @@ void KnxDevice::setProgrammingMode(bool on) {
     _programmingMode = on;
     digitalWrite(PIN_PROG_LED, on);
     _knxTpUart->setListenToBroadcasts(on);
+    
+    // set back to "not authenticated"
+    if (!on && _authRequired) {
+        _authorized = false;
+    }
+    
 }
 
 KnxTpUartSerialEventType KnxDevice::serialEvent() {
@@ -58,9 +69,7 @@ KnxTpUartSerialEventType KnxDevice::serialEvent() {
 
         case KNX_TELEGRAM: 
 //        case IRRELEVANT_KNX_TELEGRAM:
-            DEBUG_INFO("\nProcessing ...");            
             processTelegram();
-            DEBUG_INFO("Processing ... *DONE*\n\n");
             break;
           
         default:
@@ -87,15 +96,21 @@ void KnxDevice::processTelegram() {
     ApplicationControlField apci = telegram->getApplicationControlField();
     
     switch (apci) {
+    
+/*
+        case A_GROUPVALUE_WRITE:
+            telegram->print(&Serial);
+            break;
+*/
         
         case A_PHYSICALADDRESS_WRITE:
             if (_programmingMode && telegram->isTargetGroup()) {
             
+                
+#ifdef DEBUGLEVEL_DEBUG  
                 int area = (telegram->getBufferByte(8) & B11110000) >> 4;
                 int line = telegram->getBufferByte(8) & B00001111;
                 int member = telegram->getBufferByte(9);
-                
-#ifdef DEBUGLEVEL_DEBUG  
                 Serial.print("A_PHYSICALADDRESS_WRITE:);
                 Serial.print(area);
                 Serial.print(".");
@@ -104,10 +119,11 @@ void KnxDevice::processTelegram() {
                 Serial.println(member);
 #endif
                 
-                _knxTpUart->setIndividualAddress(PA_INTEGER(area, line, member));
-                
                 byte individualAddress[2];
-                _knxTpUart->getIndividualAddress(individualAddress);
+                individualAddress[0] = telegram->getBufferByte(8);
+                individualAddress[1] = telegram->getBufferByte(9);
+                
+                _knxTpUart->setIndividualAddress(individualAddress);
 
                 // store in eeprom
                 EEPROM.write(EEPROM_INDEX_PA, individualAddress[0]);
@@ -122,68 +138,146 @@ void KnxDevice::processTelegram() {
                 // Broadcast request for individual addresses of all devices in programming mode
                 DEBUG_INFO("A_PHYSICALADDRESS_READ answering ...");
 		        // Send our answer back to sender
-                _knxTpUart->individualAnswerAddress(); 
+                _knxTpUart->sendPhysicalAddressResponse(); 
             }            
             break;
-            
-        case A_PHYSICALADDRESS_RESPONSE:
-            DEBUG_INFO("A_PHYSICALADDRESS_RESPONSE");
-            telegram->print(&Serial);
-            break;
-            
+                       
         case A_DEVICEDESCRIPTOR_READ:
             DEBUG_INFO("A_DEVICEDESCRIPTOR_READ");
-            // Request for mask version (version of bus interface)
-            _knxTpUart->individualAnswerMaskVersion(telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
+//            telegram->print(&Serial);
+            int descriptorType;
+            descriptorType = telegram->getFirstDataByte();
+            
+            byte answerData[2];
+            switch(descriptorType) {
+                case 0:
+                    /*
+                      Ein KNX Busankoppler besteht prinzipiell aus zwei Teilen: 
+                      ein Kontroller und ein Übertragermodul passend zum verbundenen
+                      Medium. In den verschiedenen Speicherarten des Mikroprozessors 
+                      werden folgenden Daten gespeichert: 
+                      
+                        * die Systemsoftware : die verschiedenen standardisierten 
+                          KNX Softwareprofile werden über deren „Maskenversionen“ 
+                          oder „Device Descriptor Typ 0“ identifiziert. Die 
+                          Maskenbezeichnung ist eine 2 Byte Kodierung wobei: 
+                          
+                            * die erste Ziffer y sich auf das jeweilige Medium bezieht, 
+                              mit 0 für TP1, 1 für PL110, 2 für RF und 5 für KNXnet/IP. 
+                              Nicht alle Profile bestehen auf allen vorgenannten Medien.
+                              
+                            * Die letzte Ziffer x sich auf die jeweilige Version des 
+                              Profils bezieht.
+                          
+                          Folgende Systemprofile werden über untenstehenden 
+                          Maskenversionen ETS bekanntgegeben: 
+                          
+                            y01xh: System 1(2)
+                            y02xh: System 2(3)
+                            y70xh: System 7(4)
+                            y7Bxh: System B
+                            y300h: LTE
+                            091xh: TP1 Linien/Bereichskoppler - Repeater
+                            190xh: Medienkoppler TP1-PL110
+                            2010h: RF bi-direktionale Geräte
+                            2110h: RF unidirektionale Geräte
+                            
+                            (2) früher BCU1 genannt
+                            (3) früher BCU2 genannt
+                            (4) früher BIM M 112 genannt                
+                    */
+                    answerData[0] = 0x07; // TP1, System 7
+                    answerData[1] = 0x01; // Version 1
+                    break;
+                case 2:
+                    // read-request for type 2 has not yet been received by Tpuart, triggered by calimero.
+                    // so we define DEAD as result as long as we don't know what we should send
+                    answerData[0] = 0xDE; 
+                    answerData[1] = 0xAD;
+                    break;
+            }
+            
+            DEBUG_INFO("A_DEVICEDESCRIPTOR_READ ....");            
+            _knxTpUart->sendDeviceDescriptorResponse(telegram->getSourceArea(), 
+                                                    telegram->getSourceLine(), 
+                                                    telegram->getSourceMember(), 
+                                                    descriptorType, 
+                                                    answerData);
             break;
             
         case A_MEMORY_WRITE:        
             DEBUG_INFO("A_MEMORY_WRITE");
-            processCommandMemWrite(telegram);
+            if (_programmingMode && _authRequired) {
+                processCommandMemWrite(telegram);
+            }
             break;
 
         case A_MEMORY_READ:        
             DEBUG_INFO("A_MEMORY_READ");
-            processCommandMemRead(telegram);
+            if (_programmingMode && _authRequired) {
+                processCommandMemRead(telegram);
+            }
             break;
 
         case A_AUTHORIZE_REQUEST:
             DEBUG_INFO("A_AUTHORIZE_REQUEST");
             if (_programmingMode) {
-                DEBUG_INFO("A_AUTHORIZE_REQUEST answering ...");
+                DEBUG_INFO("A_AUTHORIZE_REQUEST answering ...telegram dump");
+
+                // dump telegram data to see structure
+//                telegram->print(&Serial);
+                
+                byte key[4];
+                key[0] = telegram->getBufferByte(9);
+                key[1] = telegram->getBufferByte(10);
+                key[2] = telegram->getBufferByte(11);
+                key[3] = telegram->getBufferByte(12);
+                
+                int accessLevel;
+                
+                if (key[0] == 0x00 &&
+                    key[1] == 0x0E &&
+                    key[2] == 0x01 &&
+                    key[3] == 0x0B) {
+                    accessLevel = 15;
+                } else {
+                    accessLevel = 0;
+                }
+
                 // Authentication request to allow memory access
-                _knxTpUart->individualAnswerAuth(15 /* accesslevel */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
+                _knxTpUart->sendAuthResponse(accessLevel /* accesslevel */, telegram->getSequenceNumber(), telegram->getSourceArea(), telegram->getSourceLine(), telegram->getSourceMember());
+                if (accessLevel==15) {
+                    _authorized = true;
+                }
             }
             break;       
-
+/*
         case A_PROPERTYVALUE_READ:
             DEBUG_INFO("A_PROPERTYVALUE_READ");                
-            if (_programmingMode) {
+            if (_programmingMode && _authorized) {
                 processCommandPropRead(telegram);
             } 
             break;
             
         case A_PROPERTYVALUE_WRITE:
             DEBUG_INFO("A_PROPERTYVALUE_WRITE");   
-            if (_programmingMode) {
+            if (_programmingMode && _authorized) {
                 processCommandPropWrite(telegram);
             }
             break;
-                 
+*/                 
 
         case A_RESTART:
             DEBUG_INFO("A_RESTART received");
-            if (_programmingMode) {
+            if (_programmingMode && _authorized) {
                 // Restart the device -> end programming mode
-                setProgrammingMode(false);
-                Serial.println("Received restart, ending programming mode"); 
+                setProgrammingMode(false);                
             }
 
             wdt_enable(WDTO_15MS);
             while(1) { 
                 // loop as fast as you can
             }
-            Serial.println("XXXXXXXXXXXXXXXXXXXXXXXX"); 
             break;    
             
 
@@ -269,6 +363,7 @@ void KnxDevice::processCommandMemWrite(KnxTelegram* telegram) {
     
 }
 
+/*
 
 void KnxDevice::processCommandPropRead(KnxTelegram* telegram) {
     // dump telegram data to see structure
@@ -318,4 +413,6 @@ void KnxDevice::processCommandPropWrite(KnxTelegram* telegram) {
     // dump telegram data to see structure
     telegram->print(&Serial);
 }
+
+*/
 

@@ -8,7 +8,7 @@ KnxTpUart::KnxTpUart(TPUART_SERIAL_CLASS* sport, byte address[2]) {
     
     _listen_group_address_count = 0;
     _tg = new KnxTelegram();
-    _tg_ptp = new KnxTelegram();
+    _tg_reply = new KnxTelegram();
     _listen_to_broadcasts = false;
     CONSOLEDEBUG("tpm")
 }
@@ -289,42 +289,42 @@ bool KnxTpUart::groupWriteBool(byte groupAddress[2], bool value) {
     }
     
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, valueAsInt);
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWrite2ByteFloat(byte groupAddress[2], float value) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->set2ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWrite2ByteInt(byte groupAddress[2], int value) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->set2ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWrite1ByteInt(byte groupAddress[2], int value) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->set1ByteIntValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWrite4ByteFloat(byte groupAddress[2], float value) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->set4ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWrite14ByteText(byte groupAddress[2], String value) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->set14ByteValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswerBool(byte groupAddress[2], bool value) {
@@ -334,79 +334,94 @@ bool KnxTpUart::groupAnswerBool(byte groupAddress[2], bool value) {
     }
     
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, valueAsInt);
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswer1ByteInt(byte groupAddress[2], int value) {
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, 0);
     _tg->set1ByteIntValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswer2ByteFloat(byte groupAddress[2], float value) {
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, 0);
     _tg->set2ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswer2ByteInt(byte groupAddress[2], int value) {
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, 0);
     _tg->set2ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswer4ByteFloat(byte groupAddress[2], float value) {
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, 0);
     _tg->set4ByteFloatValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupAnswer14ByteText(byte groupAddress[2], String value) {
     createKNXMessageFrame(2, KNX_COMMAND_ANSWER, groupAddress, 0);
     _tg->set14ByteValue(value);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
 bool KnxTpUart::groupWriteTime(byte groupAddress[2], int day, int hours, int minutes, int seconds) {
     createKNXMessageFrame(2, KNX_COMMAND_WRITE, groupAddress, 0);
     _tg->setKNXTime(day, hours, minutes, seconds);
     _tg->createChecksum();
-    return sendMessage();
+    return sendMessage(_tg);
 }
 
-bool KnxTpUart::individualAnswerAddress() {
-    createKNXMessageFrame(2, KNX_COMMAND_INDIVIDUAL_ADDR_RESPONSE, PA_INTEGER(0,0,0), 0);
+bool KnxTpUart::sendPhysicalAddressResponse() {
+    byte target[2];
+    target[0] = 0;
+    target[1] = 0;
+    
+    createKNXMessageFrame(2, KNX_COMMAND_INDIVIDUAL_ADDR_RESPONSE, target, 0);
     _tg->createChecksum();
-    return sendMessage();    
+    return sendMessage(_tg);    
 }
 
-bool KnxTpUart::individualAnswerMaskVersion(int area, int line, int member) {
-    createKNXMessageFrameIndividual(4, KNX_COMMAND_MASK_VERSION_RESPONSE, PA_INTEGER(area, line, member), 0);
-    _tg->setCommunicationType(KNX_COMM_NDP);
-    _tg->setBufferByte(8, 0x07); // Mask version part 1 for BIM M 112
-    _tg->setBufferByte(9, 0x01); // Mask version part 2 for BIM M 112
-    _tg->createChecksum();
-    return sendMessage();
+bool KnxTpUart::sendDeviceDescriptorResponse(int area, int line, int member, int descriptorType, byte deviceDescData[2]) {
+
+    byte target[2];
+    target[0] = (area << 4) | line;
+    target[1] = member;
+
+    createKNXMessageFrameIndividualReply(2+2, KNX_COMMAND_MASK_VERSION_RESPONSE, target, 0);
+    _tg_reply->setCommunicationType(KNX_COMM_NDP);
+    _tg_reply->setBufferByte(7, descriptorType);
+    _tg_reply->setBufferByte(8, deviceDescData[0]); // 0x07??
+    _tg_reply->setBufferByte(9, deviceDescData[1]); // 0x01??
+    _tg_reply->createChecksum();
+    _tg_reply->print(&Serial);
+    return sendMessage(_tg_reply);
 }
 
-bool KnxTpUart::individualAnswerAuth(int accessLevel, int sequenceNo, int area, int line, int member) {
-    createKNXMessageFrameIndividual(3, KNX_COMMAND_ESCAPE, PA_INTEGER(area, line, member), KNX_EXT_COMMAND_AUTH_RESPONSE);
-    _tg->setCommunicationType(KNX_COMM_NDP);
-    _tg->setSequenceNumber(sequenceNo);
-    _tg->setBufferByte(8, accessLevel);
-    _tg->createChecksum();
-    return sendMessage();
+bool KnxTpUart::sendAuthResponse(int accessLevel, int sequenceNo, int area, int line, int member) {
+    byte target[2];
+    target[0] = (area << 4) | line;
+    target[1] = member;
+    
+    createKNXMessageFrameIndividualReply(2+1, KNX_COMMAND_ESCAPE, target, KNX_EXT_COMMAND_AUTH_RESPONSE);
+    _tg_reply->setCommunicationType(KNX_COMM_NDP);
+    _tg_reply->setSequenceNumber(sequenceNo);
+    _tg_reply->setBufferByte(8, accessLevel);
+    _tg_reply->createChecksum();
+    return sendMessage(_tg_reply);
 }
 
 bool KnxTpUart::sendPropertyResponse(int objIndex, int propId, int start, int elements, byte data[], int sequenceNo, int area, int line, int member) {
     int payload = 2+4+elements;
     
-    // PA_INTEGER cacro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
+    // PA_INTEGER cacro does not work when setting/using directly with "_tg_reply->setTargetIndividualAddress( ... );". 
     // Method execution seems to stop and default value (false?) is returned. Se we calc it ourselves.
     byte target[2];
     target[0] = (area << 4) | line;
@@ -414,131 +429,71 @@ bool KnxTpUart::sendPropertyResponse(int objIndex, int propId, int start, int el
      
     /*
         it's important to use "another telegram". If one just uses _tg for the answer, this conflicts...
-        _tg_ptp is already there for this scenarios
+        _tg_reply is already there for this scenarios
     */
     
-    _tg_ptp->clear();
-    _tg_ptp->setSourceAddress(_individualAddress);
-    _tg_ptp->setTargetIndividualAddress(target);
+    _tg_reply->clear();
+    _tg_reply->setSourceAddress(_individualAddress);
+    _tg_reply->setTargetIndividualAddress(target);
 
-    _tg_ptp->setCommand(KNX_COMMAND_ESCAPE);
-    _tg_ptp->setFirstDataByte(KNX_EXT_COMMAND_PROP_ANSWER);
+    _tg_reply->setCommand(KNX_COMMAND_ESCAPE);
+    _tg_reply->setFirstDataByte(KNX_EXT_COMMAND_PROP_ANSWER);
 
-    _tg_ptp->setPayloadLength(payload);   
+    _tg_reply->setPayloadLength(payload);   
     
-    _tg_ptp->setCommunicationType(KNX_COMM_NDP);
-    _tg_ptp->setSequenceNumber(sequenceNo);
+    _tg_reply->setCommunicationType(KNX_COMM_NDP);
+    _tg_reply->setSequenceNumber(sequenceNo);
     
-    _tg_ptp->setBufferByte(8, objIndex);
-    _tg_ptp->setBufferByte(9, propId);
+    _tg_reply->setBufferByte(8, objIndex);
+    _tg_reply->setBufferByte(9, propId);
     // from Calimero-Source: asdu[2] = (byte) ((elements << 4) | ((start >>> 8) & 0xF));
-    _tg_ptp->setBufferByte(10, ((elements << 4) | ((start >> 8) & 0xF)));
-    _tg_ptp->setBufferByte(11, start & 0xff);
+    _tg_reply->setBufferByte(10, ((elements << 4) | ((start >> 8) & 0xF)));
+    _tg_reply->setBufferByte(11, start & 0xff);
     
     for (int i = 0; i < elements; i++) {
-        _tg_ptp->setBufferByte(12+i, data[i]);
+        _tg_reply->setBufferByte(12+i, data[i]);
     }
     
-    _tg_ptp->createChecksum();
+    _tg_reply->createChecksum();
        
-    int messageSize = _tg_ptp->getTotalLength();
-    
-    uint8_t sendbuf[2];
-    for (int i = 0; i < messageSize; i++) {
-        if (i == (messageSize - 1)) {
-            sendbuf[0] = TPUART_DATA_END;
-        } else {
-            sendbuf[0] = TPUART_DATA_START_CONTINUE;
-        }
-        
-        sendbuf[0] |= i;
-        sendbuf[1] = _tg_ptp->getBufferByte(i);
-        
-        _serialport->write(sendbuf, 2);
-    }
-    
-    
-    int confirmation;
-    while(true) {
-        confirmation = serialRead();
-        if (confirmation == B10001011) {
-            return true; // Sent successfully
-        } else if (confirmation == B00001011) {
-            return false;
-        } else if (confirmation == -1) {
-            // Read timeout
-            return false;
-        }
-    }
-    
-    return false;
+    return sendMessage(_tg_reply);
 }
 
 
 bool KnxTpUart::sendMemoryReadResponse(int start, int length, byte data[], int seqNr, int area, int line, int member) {
     int payload = 2+2+length;
     
-    // PA_INTEGER Macro does not work when setting/using directly with "_tg_ptp->setTargetIndividualAddress( ... );". 
+    // PA_INTEGER Macro does not work when setting/using directly with "_tg_reply->setTargetIndividualAddress( ... );". 
     // Method execution seems to stop and default value (false?) is returned. Se we calc it ourselves.
     byte target[2];
     target[0] = (area << 4) | line;
     target[1] = member;
      
     
-    _tg_ptp->clear();
-    _tg_ptp->setSourceAddress(_individualAddress);
-    _tg_ptp->setTargetIndividualAddress(target);
+    _tg_reply->clear();
+    _tg_reply->setSourceAddress(_individualAddress);
+    _tg_reply->setTargetIndividualAddress(target);
 
-    _tg_ptp->setCommand(KNX_COMMAND_MEM_ANSWER);
+    _tg_reply->setCommand(KNX_COMMAND_MEM_ANSWER);
     
-    _tg_ptp->setPayloadLength(payload);   
+    _tg_reply->setPayloadLength(payload);   
     
-    _tg_ptp->setCommunicationType(KNX_COMM_NDP);
-    _tg_ptp->setSequenceNumber(seqNr);
+    _tg_reply->setCommunicationType(KNX_COMM_NDP);
+    _tg_reply->setSequenceNumber(seqNr);
     
     // B0100000 --> mem response
-    _tg_ptp->setBufferByte(7, B01000000 | length);
+    _tg_reply->setBufferByte(7, B01000000 | length);
     
-    _tg_ptp->setBufferByte(8, start>>8);
-    _tg_ptp->setBufferByte(9, start&0xff);
+    _tg_reply->setBufferByte(8, start>>8);
+    _tg_reply->setBufferByte(9, start&0xff);
     
     for (int i = 0; i < length; i++) {
-        _tg_ptp->setBufferByte(10+i, data[i]);
+        _tg_reply->setBufferByte(10+i, data[i]);
     }
       
-    _tg_ptp->createChecksum();
+    _tg_reply->createChecksum();
        
-    int messageSize = _tg_ptp->getTotalLength();
-    
-    uint8_t sendbuf[2];
-    for (int i = 0; i < messageSize; i++) {
-        if (i == (messageSize - 1)) {
-            sendbuf[0] = TPUART_DATA_END;
-        } else {
-            sendbuf[0] = TPUART_DATA_START_CONTINUE;
-        }
-        
-        sendbuf[0] |= i;
-        sendbuf[1] = _tg_ptp->getBufferByte(i);
-        
-        _serialport->write(sendbuf, 2);
-    }
-    
-    
-    int confirmation;
-    while(true) {
-        confirmation = serialRead();
-        if (confirmation == B10001011) {
-            return true; // Sent successfully
-        } else if (confirmation == B00001011) {
-            return false;
-        } else if (confirmation == -1) {
-            // Read timeout
-            return false;
-        }
-    }
-    
-    return false;
+    return sendMessage(_tg_reply);
 }
 
 
@@ -552,64 +507,38 @@ void KnxTpUart::createKNXMessageFrame(int payloadlength, KnxCommandType command,
     _tg->createChecksum();
 }
 
-void KnxTpUart::createKNXMessageFrameIndividual(int payloadlength, KnxCommandType command, byte targetIndividualAddress[2], int firstDataByte) {
-    _tg->clear();
-    _tg->setSourceAddress(_individualAddress);
-    _tg->setTargetIndividualAddress(targetIndividualAddress);
-    _tg->setFirstDataByte(firstDataByte);
-    _tg->setCommand(command);
-    _tg->setPayloadLength(payloadlength);
-    _tg->createChecksum();
+void KnxTpUart::createKNXMessageFrameIndividualReply(int payloadlength, KnxCommandType command, byte targetIndividualAddress[2], int firstDataByte) {
+    _tg_reply->clear();
+    _tg_reply->setSourceAddress(_individualAddress);
+    _tg_reply->setTargetIndividualAddress(targetIndividualAddress);
+    _tg_reply->setFirstDataByte(firstDataByte);
+    _tg_reply->setCommand(command);
+    _tg_reply->setPayloadLength(payloadlength);
+    _tg_reply->createChecksum();
 }
 
 /*
  * Sends T_DATA_ACK_PDU
  */
 bool KnxTpUart::sendTransportDataAckPDU(int sequenceNo, byte targetIndividualAddress[2]) {
-    _tg_ptp->clear();
-    _tg_ptp->setSourceAddress(_individualAddress);
-    _tg_ptp->setTargetIndividualAddress(targetIndividualAddress);
-    _tg_ptp->setSequenceNumber(sequenceNo);
-    _tg_ptp->setCommunicationType(KNX_COMM_NCD);
-    _tg_ptp->setControlData(KNX_CONTROLDATA_POS_CONFIRM);
-    _tg_ptp->setPayloadLength(1);
-    _tg_ptp->createChecksum();
+    _tg_reply->clear();
+    _tg_reply->setSourceAddress(_individualAddress);
+    _tg_reply->setTargetIndividualAddress(targetIndividualAddress);
+    _tg_reply->setSequenceNumber(sequenceNo);
+    _tg_reply->setCommunicationType(KNX_COMM_NCD);
+    _tg_reply->setControlData(KNX_CONTROLDATA_POS_CONFIRM);
+    _tg_reply->setPayloadLength(1);
+    _tg_reply->createChecksum();
     
-    int messageSize = _tg_ptp->getTotalLength();
-    
-    uint8_t sendbuf[2];
-    for (int i = 0; i < messageSize; i++) {
-        if (i == (messageSize - 1)) {
-            sendbuf[0] = TPUART_DATA_END;
-        } else {
-            sendbuf[0] = TPUART_DATA_START_CONTINUE;
-        }
-        
-        sendbuf[0] |= i;
-        sendbuf[1] = _tg_ptp->getBufferByte(i);
-        
-        _serialport->write(sendbuf, 2);
-    }
-    
-    int confirmation;
-    while(true) {
-        confirmation = serialRead();
-        if (confirmation == B10001011) {
-            return true; // Sent successfully
-        } else if (confirmation == B00001011) {
-            return false;
-        } else if (confirmation == -1) {
-            // Read timeout
-            return false;
-        }
-    }
-    
-    return false;
+    return sendMessage(_tg_reply);
 }
 
-bool KnxTpUart::sendMessage() {
+bool KnxTpUart::sendMessage(KnxTelegram* tg) {
 
-    int messageSize = _tg->getTotalLength();
+//    Serial.println("Sending Message");
+//    tg->print(&Serial);
+
+    int messageSize = tg->getTotalLength();
 
     uint8_t sendbuf[2];
     for (int i = 0; i < messageSize; i++) {
@@ -620,11 +549,10 @@ bool KnxTpUart::sendMessage() {
         }
         
         sendbuf[0] |= i;
-        sendbuf[1] = _tg->getBufferByte(i);
+        sendbuf[1] = tg->getBufferByte(i);
         
         int sent = _serialport->write(sendbuf, 2);
     }
-
 
     int confirmation;
     while(true) {

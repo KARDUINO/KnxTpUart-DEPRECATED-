@@ -92,9 +92,9 @@ public:
     void addListenGroupAddress(byte* groupAddress);  
     bool isListeningToGroupAddress(byte* groupAddress);
     
-    bool individualAnswerAddress();
-    bool individualAnswerMaskVersion(int, int, int);
-    bool individualAnswerAuth(int, int, int, int, int);
+    bool sendPhysicalAddressResponse();
+    bool sendDeviceDescriptorResponse(int area, int line, int member, int descriptorType, byte* deviceDescData);
+    bool sendAuthResponse(int, int, int, int, int);
 
     bool sendPropertyResponse(int objIndex, int propId, int start, int elements, byte* data, int sequenceNo, int area, int line, int member);
     bool sendMemoryReadResponse(int start, int length, byte* data, int seqNr, int area, int line, int member);
@@ -107,7 +107,7 @@ public:
 private:
     Stream* _serialport;
     KnxTelegram* _tg;       // for normal communication
-    KnxTelegram* _tg_ptp;   // for PTP sequence confirmation
+    KnxTelegram* _tg_reply;   // for reply communication
     byte _individualAddress[2];
     byte _listen_group_addresses[MAX_LISTEN_GROUP_ADDRESSES][2];
     byte _listen_group_address_count;
@@ -118,8 +118,8 @@ private:
     void printByte(int);
     bool readKNXTelegram();
     void createKNXMessageFrame(int, KnxCommandType, byte* targetGroupAddress, int);
-    void createKNXMessageFrameIndividual(int, KnxCommandType, byte* targetIndividualAddress, int);
-    bool sendMessage();
+    void createKNXMessageFrameIndividualReply(int, KnxCommandType, byte* targetIndividualAddress, int);
+    bool sendMessage(KnxTelegram* telegram);
     bool sendTransportDataAckPDU(int, byte* targetIndividualAddress);
     int serialRead();
 
